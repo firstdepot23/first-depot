@@ -1,0 +1,26 @@
+{
+  "name": "product-service",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "npx tsx --env-file=.env --watch src/index.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@clerk/express": "^2.1.69",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "@repo/product-db": "*",
+    "@repo/kafka": "*"
+  },
+  "description": "",
+  "devDependencies": {
+    "@repo/types": "*",
+    "@repo/typescript-config": "*",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
+  }
+}

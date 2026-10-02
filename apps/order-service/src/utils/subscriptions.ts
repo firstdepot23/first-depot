@@ -1,0 +1,15 @@
+import { OrderType } from "@repo/types";
+import { consumer } from "./kafka";
+import { createOrder } from "./order";
+
+export const runKafkaSubscriptions = async () => {
+  consumer.subscribe([
+    {
+      topicName: "payment.successful",
+      topicHandler: async (message: { value: OrderType }) => {
+        const order = message.value;
+        await createOrder(order);
+      },
+    },
+  ]);
+};
