@@ -6,10 +6,20 @@ import { connectOrderDB } from "@repo/order-db";
 import { orderRoute } from "./routes/order.js";
 import { consumer, producer } from "./utils/kafka.js";
 import { runKafkaSubscriptions } from "./utils/subscriptions.js";
+import cors from "@fastify/cors";
 
 const fastify = Fastify();
 
 fastify.register(clerkPlugin);
+
+
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3004")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+fastify.register(cors, { origin: allowedOrigins });
 
 fastify.get("/health", async (request, reply) => {
   return reply.status(200).send({
