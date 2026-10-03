@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import sendMail from "./utils/email-service-mailer";
+import sendMail from "./utils/mailer";
 import { createConsumer, createKafkaClient } from "@repo/kafka/src";
 
 const kafka = createKafkaClient("email-service");
