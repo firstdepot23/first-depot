@@ -11,7 +11,10 @@ import bankCardRoute from "./routes/bankcard.route.js";
 
 const app = new Hono();
 app.use("*", clerkMiddleware());
-app.use("*", cors({ origin: ["http://localhost:3004"] }));
+/*app.use("*", cors({ origin: ["http://localhost:3004"] }));*/
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3004")
+  .split(",");
+app.use("*", cors({ origin: allowedOrigins }));
 
 app.get("/health", (c) => {
   return c.json({
