@@ -6,9 +6,18 @@ import userRoute from "./routes/user.route";
 import { producer } from "./utils/kafka.js";
 
 const app = express();
+
+// Comma-separated list, e.g.
+// ALLOWED_ORIGINS=https://your-admin.onrender.com
+// (no spaces, no trailing slashes). Falls back to localhost for local dev.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3003")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: ["http://localhost:3003"],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -32,11 +41,14 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     .json({ message: err.message || "Inter Server Error!" });
 });
 
+// Render injects PORT. Locally, set PORT=8003 in .env (or rely on the fallback).
+const port = Number(process.env.PORT) || 8003;
+
 const start = async () => {
   try {
     await producer.connect();
-    app.listen(8003, () => {
-      console.log("Auth service is running on 8003");
+    app.listen(port, () => {
+      console.log(`Auth service is running on ${port}`);
     });
   } catch (error) {
     console.log(error);
