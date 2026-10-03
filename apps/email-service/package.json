@@ -5,7 +5,8 @@
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "dev": "tsx --env-file=.env --watch src/index.ts"
+    "dev": "tsx --env-file=.env --watch src/index.ts",
+    "start": "tsx src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,11 +14,10 @@
   "dependencies": {
     "@repo/kafka": "*",
     "@repo/types": "*",
-    "nodemailer": "^10.0.10"
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "^26.6.2",
-    "@types/nodemailer": "^8.0.2"
+    "@types/node": "^26.6.2"
   }
 }
