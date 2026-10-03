@@ -12,9 +12,10 @@
     "types": ["node"]
   },
   "include": [
-    "src/**/*.ts",
-    "generated/**/*.ts"
-  ],
+  "src/**/*.ts",
+  "generated/**/*.ts",
+  "prisma7.config.ts"
+],
   "exclude": [
     "node_modules",
     "dist"
