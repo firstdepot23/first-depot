@@ -32,6 +32,9 @@ fastify.get(
 
 fastify.register(orderRoute);
 
+// Render injects PORT. Locally, set PORT=8001 in .env (or rely on the fallback).
+const port = Number(process.env.PORT) || 8001;
+
 const start = async () => {
   try {
     await connectOrderDB();
@@ -41,11 +44,11 @@ const start = async () => {
     await runKafkaSubscriptions();
 
     await fastify.listen({
-      port: 8001,
+      port,
       host: "0.0.0.0",
     });
 
-    console.log("Order service is running on port 8001");
+    console.log(`Order service is running on port ${port}`);
   } catch (err) {
     console.log(err);
     process.exit(1);

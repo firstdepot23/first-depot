@@ -6,9 +6,13 @@ import productRouter from "./routes/product.route";
 import categoryRouter from "./routes/category.route";
 import { consumer, producer } from "./utils/kafka.js";
 const app = express();
+const allowedOrigins = (
+  process.env.ALLOWED_ORIGINS ?? "http://localhost:3003,http://localhost:3004"
+).split(",");
+
 app.use(
   cors({
-    origin: ["http://localhost:3003", "http://localhost:3004"],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -37,11 +41,13 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     .json({ message: err.message || "Inter Server Error!" });
 });
 
+const port = Number(process.env.PORT) || 8000;
+
 const start = async () => {
   try {
-    Promise.all([await producer.connect(), await consumer.connect()]);
-    app.listen(8000, () => {
-      console.log("Product service is running on 8000");
+    await Promise.all([producer.connect(), consumer.connect()]);
+    app.listen(port, () => {
+      console.log(`Product service is running on ${port}`);
     });
   } catch (error) {
     console.log(error);
@@ -49,4 +55,4 @@ const start = async () => {
   }
 };
 
-start()
+start();
