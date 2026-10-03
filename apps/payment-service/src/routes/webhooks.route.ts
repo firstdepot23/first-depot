@@ -15,7 +15,6 @@ webhookRoute.get("/", (c) => {
   });
 });
 
-
 webhookRoute.post("/stripe", async (c) => {
   const body = await c.req.text();
   const sig = c.req.header("stripe-signature");
@@ -30,29 +29,38 @@ webhookRoute.post("/stripe", async (c) => {
   }
 
   switch (event.type) {
-    case "checkout.session.completed":
+    case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      const lineItems = await stripe.checkout.sessions.listLineItems(
-        session.id
-      );
-      // TODO: CREATE ORDER
-      producer.send("payment.successful", {
-        value: {
-          userId: session.client_reference_id,
-          email: session.customer_details?.email,
-          amount: session.amount_total,
-          status: session.payment_status === "paid" ? "success" : "failed",
-          paymentMethod: "stripe",
-          products: lineItems.data.map((item) => ({
-            name: item.description,
-            quantity: item.quantity,
-            price: item.price?.unit_amount,
-          })),
-        },
-      });
+      try {
+        const lineItems = await stripe.checkout.sessions.listLineItems(
+          session.id
+        );
+
+        // Awaited so a Kafka failure is caught here instead of becoming an
+        // unhandled rejection that crashes the whole service.
+        await producer.send("payment.successful", {
+          value: {
+            userId: session.client_reference_id,
+            email: session.customer_details?.email,
+            amount: session.amount_total,
+            status: session.payment_status === "paid" ? "success" : "failed",
+            paymentMethod: "stripe",
+            products: lineItems.data.map((item) => ({
+              name: item.description,
+              quantity: item.quantity,
+              price: item.price?.unit_amount,
+            })),
+          },
+        });
+      } catch (error) {
+        console.error("stripe webhook: failed to publish payment.successful:", error);
+        // A non-2xx response makes Stripe retry the webhook later.
+        return c.json({ error: "Failed to process event" }, 500);
+      }
 
       break;
+    }
 
     default:
       break;
@@ -85,9 +93,11 @@ webhookRoute.get("/pesapal", async (c) => {
     const result = await getPesapalTransactionStatus(orderTrackingId);
 
     if (result.status_code === 1) {
-      // TODO: CREATE ORDER (mirror the Stripe checkout.session.completed
-      // handler above - this is the mobile money equivalent of it)
-      producer.send("payment.successful", {
+      // TODO: the order service needs userId, email and products to create
+      // an order, and this message does not carry them yet. Save the user
+      // and cart when the payment is initiated (keyed by the merchant
+      // reference) and include them here.
+      await producer.send("payment.successful", {
         value: {
           reference: orderMerchantReference,
           orderTrackingId,
@@ -101,15 +111,14 @@ webhookRoute.get("/pesapal", async (c) => {
         },
       });
     } else if (result.status_code === 2 || result.status_code === 3) {
-      producer.send("payment.failed", {
-        value: {
-          reference: orderMerchantReference,
-          orderTrackingId,
-          status: "failed",
-          paymentMethod: "mobile_money",
-          provider: result.payment_method,
-        },
-      });
+      // Nothing consumes a "payment.failed" topic yet, and the Kafka plan
+      // limits how many topics can exist, so just log it for now.
+      console.log(
+        "Pesapal payment failed:",
+        orderMerchantReference,
+        orderTrackingId,
+        result.payment_method,
+      );
     }
     // status_code 0 (INVALID) - Pesapal will typically call the IPN again
     // once the transaction resolves, so there's nothing to do yet.
