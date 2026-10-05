@@ -1,24 +1,3 @@
-/**
- * Thin client around Pesapal's API 3.0 (https://developer.pesapal.com).
- *
- * Flow this supports, end to end:
- *   1. getAccessToken()      - Pesapal bearer token, cached until it expires.
- *   2. submitPesapalOrder()  - creates an order, returns a redirect_url.
- *                              Send the customer's browser there; Pesapal
- *                              hosts the actual MTN/Airtel Money (or card)
- *                              payment UI, we never touch phone/card entry.
- *   3. Pesapal redirects the customer back to PESAPAL_CALLBACK_URL and
- *      separately calls your registered IPN URL - both carry
- *      OrderTrackingId + OrderMerchantReference as query params.
- *   4. getPesapalTransactionStatus() - call this (from the IPN handler,
- *      and/or the callback page) with that OrderTrackingId to find out
- *      what actually happened. Never trust the callback/IPN params alone
- *      as proof of payment - always re-check status_code against Pesapal.
- *
- * registerPesapalIpn() is a one-off setup helper, not something you call
- * per-payment - see the comment above it.
- */
-
 const PESAPAL_BASE_URL = process.env.PESAPAL_BASE_URL as string;
 const PESAPAL_CONSUMER_KEY = process.env.PESAPAL_CONSUMER_KEY as string;
 const PESAPAL_CONSUMER_SECRET = process.env.PESAPAL_CONSUMER_SECRET as string;
@@ -47,11 +26,6 @@ type PesapalTokenResponse = {
   message: string;
 };
 
-// Pesapal tokens are short-lived (a few minutes). Cache in memory and
-// re-request a bit before actual expiry rather than on every call - this
-// module-level cache is per server process, which is fine for a single
-// payment-service instance; if you scale this horizontally you may see
-// each instance request its own token, which Pesapal is fine with.
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 const getAccessToken = async (): Promise<string> => {

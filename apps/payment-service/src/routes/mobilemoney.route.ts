@@ -22,10 +22,7 @@ mobileMoneyRoute.post("/initiate", shouldBeUser, async (c) => {
       return c.json({ error: "Cart is empty" }, 400);
     }
 
-    // Pull the customer's name/email/phone straight from Clerk rather than
-    // trusting whatever the client sends for anything but an optional
-    // phone override - we already have this data, and Pesapal's
-    // billing_address needs at least an email.
+  
     const user = await clerkClient.users.getUser(userId);
     const email =
       user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
@@ -47,9 +44,7 @@ mobileMoneyRoute.post("/initiate", shouldBeUser, async (c) => {
       description: `Order ${reference}`,
       billingAddress: {
         email_address: email,
-        // `phone` here is an optional override the form lets the customer
-        // type in; Pesapal's own hosted page also lets them edit it, so
-        // this is a convenience, not a requirement.
+     
         phone_number: phone || user.phoneNumbers[0]?.phoneNumber,
         first_name: user.firstName ?? undefined,
         last_name: user.lastName ?? undefined,

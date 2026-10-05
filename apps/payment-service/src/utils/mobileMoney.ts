@@ -5,21 +5,17 @@ import {
 } from "./pesapal";
 
 export type InitiateMobileMoneyPaymentInput = {
-  amount: number; // UGX, whole shillings for the entire cart
-  reference: string; // your own reference id for this attempt (merchant_reference)
+  amount: number; 
+  reference: string; 
   description?: string;
   billingAddress: PesapalBillingAddress;
 };
 
 export type MobileMoneyChargeResult = {
-  // This is Pesapal's order_tracking_id, not your own `reference` above -
-  // it's what you poll/verify status with and what mobilemoney.route.ts's
-  // /status/:reference expects.
+  
   reference: string;
   status: "pending" | "successful" | "failed";
-  // Only present on initiate: send the browser here to complete payment.
-  // Pesapal - not us - collects the phone number and drives the MTN/Airtel
-  // USSD approval prompt on its own hosted page.
+  
   redirectUrl?: string;
 };
 
@@ -44,12 +40,12 @@ const mapPesapalStatus = (
   statusCode: number,
 ): MobileMoneyChargeResult["status"] => {
   switch (statusCode) {
-    case 1: // COMPLETED
+    case 1: 
       return "successful";
-    case 2: // FAILED
-    case 3: // REVERSED
+    case 2: 
+    case 3: 
       return "failed";
-    case 0: // INVALID
+    case 0: 
     default:
       return "pending";
   }
