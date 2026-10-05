@@ -43,7 +43,8 @@ const CartContent = () => {
 
   const activeStep = parseInt(searchParams.get("step") || "1");
 
-  const { cart, removeFromCart, updateQuantity } = useCartStore();
+  const { cart, removeFromCart, updateQuantity, loadError, requestReload } =
+    useCartStore();
 
   const subtotal = cart.reduce(
     (acc, item) => acc + item.price * item.quantity,
@@ -126,7 +127,27 @@ const CartContent = () => {
             {/* STEPS */}
             <div className="w-full lg:w-7/12 shadow-lg border-1 border-gray-100 p-8 rounded-lg flex flex-col gap-8 h-max">
               {!ready ? (
-                <p className="text-sm text-gray-500">Loading your cart...</p>
+                loadError ? (
+                  <div className="flex flex-col items-start gap-3">
+                    <p className="text-sm text-gray-700">{loadError}</p>
+                    <button
+                      type="button"
+                      onClick={() => requestReload()}
+                      className="bg-gray-800 hover:bg-gray-900 transition-all duration-300 text-white px-4 py-2 rounded-lg text-sm cursor-pointer"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm text-gray-500">
+                      Loading your cart...
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      This can take a few seconds if the server is waking up.
+                    </p>
+                  </div>
+                )
               ) : activeStep === 1 ? (
                 cart.length === 0 ? (
                   <div className="flex flex-col items-center gap-4 py-8">

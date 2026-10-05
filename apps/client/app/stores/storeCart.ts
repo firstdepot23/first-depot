@@ -26,6 +26,8 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
   (set) => ({
     cart: [],
     isLoaded: false,
+    loadError: null,
+    reloadKey: 0,
     addToCart: (product) =>
       set((state) => {
         const existingIndex = state.cart.findIndex((p) =>
@@ -72,8 +74,12 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
     // Used by CartSync to load the cart from the server on sign-in.
     // Fetching the same server cart twice and replacing with it twice
     // is naturally a no-op, which is why this needs no merge math.
-    replaceCart: (items) => set({ cart: items, isLoaded: true }),
-    clearCart: () => set({ cart: [], isLoaded: true }),
+    replaceCart: (items) =>
+      set({ cart: items, isLoaded: true, loadError: null }),
+    clearCart: () => set({ cart: [], isLoaded: true, loadError: null }),
+    setLoadError: (message) => set({ loadError: message }),
+    requestReload: () =>
+      set((state) => ({ loadError: null, reloadKey: state.reloadKey + 1 })),
   }),
 );
 

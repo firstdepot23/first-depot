@@ -7,86 +7,101 @@ import { fetchServerCart, saveServerCart } from "../lib/cartApi";
 
 const SAVE_DEBOUNCE_MS = 600;
 
-/**
- * Keeps the cart in sync with MongoDB - the only place it lives now.
- * Mount this once near the root of the app, inside <ClerkProvider>
- * (it needs useAuth) - e.g. in app/layout.tsx.
- *
- * - On sign-in: fetches the account's cart from the server and loads
- *   it into the store. No merge step - since the cart only ever exists
- *   in the database, the server's copy is the only copy, so loading it
- *   is a plain replace, not a merge. That also makes this safe to run
- *   more than once with the same result (e.g. across reloads).
- * - While signed in: every local cart change is pushed to the server,
- *   debounced so rapid +/- clicks don't fire a request each.
- * - On sign-out: clears the local store.
- *
- * Renders nothing - it's a background sync, not UI.
- */
 const CartSync = () => {
   const { isLoaded: authLoaded, isSignedIn, userId, getToken } = useAuth();
   const cart = useCartStore((state) => state.cart);
-  // Whether the store's cart actually reflects the server yet (false
-  // until the first successful replaceCart/clearCart). The push effect
-  // below must never run before this is true - see the comment there.
+  // Whether the store's cart actually reflects the server yet. The push
+  // effect below must never run before this is true - see the comment there.
   const cartLoaded = useCartStore((state) => state.isLoaded);
+  // Bumped by the "Try again" button to make the load effect run again.
+  const reloadKey = useCartStore((state) => state.reloadKey);
   const replaceCart = useCartStore((state) => state.replaceCart);
   const clearCart = useCartStore((state) => state.clearCart);
+  const setLoadError = useCartStore((state) => state.setLoadError);
 
-  // Tracks which user's cart we've already fetched, so sign-in only
-  // fetches once per session instead of on every render.
-  const lastFetchedUserId = useRef<string | null>(null);
-  // Set right after replaceCart() during the sign-in load, so the
-  // "push on change" effect below doesn't immediately re-save what was
-  // just loaded from the server.
+  // The user whose cart has been SUCCESSFULLY loaded.
+  const loadedForUserId = useRef<string | null>(null);
+  // The user whose cart is being fetched right now (prevents double fetches,
+  // e.g. from React Strict Mode running effects twice in development).
+  const loadingForUserId = useRef<string | null>(null);
+  // Who is signed in right now, so a slow response for a previous account
+  // can be ignored.
+  const currentUserId = useRef<string | null>(null);
+  // Set right after replaceCart() during the load, so the "push on change"
+  // effect below doesn't immediately re-save what was just loaded.
   const skipNextPush = useRef(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    currentUserId.current = isSignedIn && userId ? userId : null;
+  });
 
   // Load-on-sign-in / clear-on-sign-out.
   useEffect(() => {
     if (!authLoaded) return;
 
-    const run = async () => {
-      if (isSignedIn && userId && lastFetchedUserId.current !== userId) {
-        lastFetchedUserId.current = userId;
-        try {
-          const token = await getToken();
-          if (!token) return;
-
-          const serverCart = await fetchServerCart(token);
-          skipNextPush.current = true;
-          replaceCart(serverCart);
-        } catch (error) {
-          console.error("Cart fetch failed:", error);
-        }
-      }
-
-      if (!isSignedIn && lastFetchedUserId.current !== null) {
-        lastFetchedUserId.current = null;
+    if (!isSignedIn || !userId) {
+      setLoadError(null);
+      if (
+        loadedForUserId.current !== null ||
+        loadingForUserId.current !== null
+      ) {
+        loadedForUserId.current = null;
+        loadingForUserId.current = null;
         clearCart();
+      }
+      return;
+    }
+
+    if (
+      loadedForUserId.current === userId ||
+      loadingForUserId.current === userId
+    ) {
+      return;
+    }
+
+    loadingForUserId.current = userId;
+    setLoadError(null);
+
+    const load = async () => {
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("No session token available yet");
+
+        const serverCart = await fetchServerCart(token);
+
+        // Signed out or switched account while we were waiting.
+        if (currentUserId.current !== userId) return;
+
+        loadedForUserId.current = userId;
+        skipNextPush.current = true;
+        replaceCart(serverCart);
+      } catch (error) {
+        console.error("Cart fetch failed:", error);
+        if (currentUserId.current === userId) {
+          setLoadError(
+            "We couldn't load your cart right now. Your saved items are safe.",
+          );
+        }
+      } finally {
+        if (loadingForUserId.current === userId) {
+          loadingForUserId.current = null;
+        }
       }
     };
 
-    run();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoaded, isSignedIn, userId]);
+  }, [authLoaded, isSignedIn, userId, reloadKey]);
 
   // Push local changes to the server while signed in.
   //
-  // cartLoaded is the critical guard here. Without it, this effect fires
-  // the instant authLoaded/isSignedIn become true - the SAME render the
-  // load effect above starts its (async) fetch. At that moment `cart`
-  // is still [] (the store's initial value, nothing fetched yet), so
-  // this would schedule a save of an EMPTY cart. Normally that stale
-  // timeout gets cancelled when the real fetch finishes and `cart`
-  // changes (the cleanup below clears it) - but if the fetch takes
-  // longer than SAVE_DEBOUNCE_MS (slow network, several items to
-  // hydrate against product-service), the stale empty-cart save fires
-  // FIRST and overwrites the real cart in MongoDB with nothing. That's
-  // not just a display glitch - it actually erases the saved cart.
-  // Requiring cartLoaded means this effect can't run at all until a
-  // real load has already landed, so there's no empty cart left to
-  // accidentally push.
+  // cartLoaded is the critical guard here. Without it, this effect would
+  // fire while `cart` is still the store's initial [] and could save an
+  // EMPTY cart over the real one in MongoDB if the fetch is slow. Requiring
+  // cartLoaded means nothing is pushed until a real load has landed - and
+  // since a failed load never sets cartLoaded, a failed load can no longer
+  // lead to the saved cart being overwritten either.
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !cartLoaded) return;
 

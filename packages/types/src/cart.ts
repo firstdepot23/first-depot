@@ -35,6 +35,11 @@ export type CartStoreStateType = {
   // not guarding against a hydration mismatch, since the cart now
   // starts as [] identically on server and client every time.
   isLoaded: boolean;
+  // Set when loading the cart from the server failed (so the cart page can
+  // show an error + "Try again" instead of loading forever). Null otherwise.
+  loadError: string | null;
+  // Bumped by requestReload() to make CartSync fetch the cart again.
+  reloadKey: number;
 };
 
 export type CartStoreActionsType = {
@@ -52,4 +57,7 @@ export type CartStoreActionsType = {
   // a time via CartSync's debounced save.
   replaceCart: (items: CartItemsType) => void;
   clearCart: () => void;
+  setLoadError: (message: string | null) => void;
+  // Clears any load error and asks CartSync to fetch the cart again.
+  requestReload: () => void;
 };
