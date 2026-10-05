@@ -1,12 +1,30 @@
 import { Prisma, prisma } from "@repo/product-db";
 import { Request, Response } from "express";
 
-// Prisma error codes we translate into proper HTTP responses.
-//   P2002 - unique constraint failed (e.g. duplicate slug)
-//   P2003 - foreign key constraint failed (e.g. category still has products)
-//   P2025 - record not found
+
 const hasPrismaCode = (error: unknown, code: string) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+
+
+const duplicateField = (error: unknown): "slug" | "name" | undefined => {
+  const text = error instanceof Error ? error.message : "";
+  if (text.includes("slug")) return "slug";
+  if (text.includes("name")) return "name";
+  return undefined;
+};
+
+const duplicateMessage = (
+  field: "slug" | "name" | undefined,
+  data: { name?: unknown; slug?: unknown },
+) => {
+  if (field === "slug") {
+    return `The slug "${String(data.slug)}" is already used by another category.`;
+  }
+  if (field === "name") {
+    return `A category named "${String(data.name)}" already exists.`;
+  }
+  return "A category with this name or slug already exists.";
+};
 
 export const createCategory = async (req: Request, res: Response) => {
   try {
@@ -20,9 +38,10 @@ export const createCategory = async (req: Request, res: Response) => {
     return res.status(201).json(category);
   } catch (error) {
     if (hasPrismaCode(error, "P2002")) {
+      const field = duplicateField(error);
       return res
         .status(409)
-        .json({ message: "A category with this name or slug already exists" });
+        .json({ message: duplicateMessage(field, req.body ?? {}), field });
     }
 
     console.error("createCategory failed:", error);
@@ -46,9 +65,10 @@ export const updateCategory = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Category not found" });
     }
     if (hasPrismaCode(error, "P2002")) {
+      const field = duplicateField(error);
       return res
         .status(409)
-        .json({ message: "A category with this name or slug already exists" });
+        .json({ message: duplicateMessage(field, req.body ?? {}), field });
     }
 
     console.error("updateCategory failed:", error);
