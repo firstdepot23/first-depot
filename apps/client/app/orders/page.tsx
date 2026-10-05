@@ -6,9 +6,6 @@ import RetryButton from "../components/RetryButton";
 type FetchResult =
   { ok: true; orders: OrderType[] } | { ok: false; message: string };
 
-// Previously every failure (bad URL, 401, server asleep) returned [] and the
-// page just looked like "no orders". Now each failure is logged with its
-// status and shown to the user, so an empty list really means "no orders".
 const fetchOrders = async (): Promise<FetchResult> => {
   const baseUrl = process.env.NEXT_PUBLIC_ORDER_SERVICE_URL;
   if (!baseUrl) {

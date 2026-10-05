@@ -32,14 +32,14 @@ export const createProduct = async (req: Request, res: Response) => {
       price: product.price,
     };
 
-    // This publish was previously commented out, which meant new products
-    // were saved locally but never created on Stripe. Checkout would then
-    // fail with "No such product" because payment-service never heard
-    // about the product to sync it. Sending is fire-and-forget here (like
-    // the product.deleted publish below), but errors are still logged so a
-    // broker/connection issue doesn't fail silently.
+    // The send is now awaited. Before, producer.send() returned a promise
+    // that nothing waited for, so the try/catch never caught a failure and
+    // a broker problem became an unhandled rejection, which crashes Node
+    // (and Render answers 502 until the service restarts).
+    // The product is already saved, so a Kafka failure is logged instead of
+    // turning the request into an error.
     try {
-      producer.send("product.created", { value: stripeProduct });
+      await producer.send("product.created", { value: stripeProduct });
     } catch (kafkaError) {
       console.error("Failed to publish product.created:", kafkaError);
     }
@@ -84,7 +84,13 @@ export const deleteProduct = async (req: Request, res: Response) => {
       where: { id: Number(id) },
     });
 
-    producer.send("product.deleted", { value: Number(id) });
+    // Awaited and caught separately: the product is already deleted, so a
+    // Kafka failure must not crash the service or report the delete as failed.
+    try {
+      await producer.send("product.deleted", { value: Number(id) });
+    } catch (kafkaError) {
+      console.error("Failed to publish product.deleted:", kafkaError);
+    }
 
     return res.status(200).json(deletedProduct);
   } catch (error) {
@@ -140,6 +146,8 @@ export const getProducts = async (req: Request, res: Response) => {
     // needed here. This only exists so a real failure (e.g. the DB being
     // unreachable) doesn't crash the request; the client still gets a
     // usable, empty response instead of a 500 with a stack trace.
+    // If products are unexpectedly empty, look for "getProducts failed" in
+    // this service's logs.
     return res.status(200).json(products);
   } catch (error) {
     console.error("getProducts failed:", error);

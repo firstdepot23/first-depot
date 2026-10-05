@@ -1,26 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 
-// All three social marks are drawn as inline SVGs instead of imported
-// from lucide-react - lucide's icon exports (including Youtube) have
-// changed name/availability across versions, so this keeps the footer
-// from breaking on a package upgrade or downgrade.
 const YoutubeIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8zM9.6 15.5V8.5l6.3 3.5-6.3 3.5z" />
   </svg>
 );
 
-// Lucide has no TikTok mark, so it's drawn as an inline SVG to match the
-// stroke-style Youtube icon next to it.
 const TikTokIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M16.6 5.82c-1-.9-1.6-2.2-1.6-3.6h-3.3v13.9c0 1.6-1.3 2.9-2.9 2.9s-2.9-1.3-2.9-2.9 1.3-2.9 2.9-2.9c.3 0 .6 0 .9.1v-3.3c-.3 0-.6-.1-.9-.1-3.4 0-6.1 2.7-6.1 6.1s2.7 6.1 6.1 6.1 6.1-2.7 6.1-6.1V9.1c1.3.9 2.9 1.5 4.6 1.5V7.3c-1.1 0-2.1-.4-2.9-1.1z" />
   </svg>
 );
 
-// Same X mark used across the app, drawn inline so no extra icon
-// dependency is needed for a single glyph.
 const XIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M18.3 3H21l-6.7 7.6L22 21h-6.6l-5.2-6.6L4.2 21H1.5l7.2-8.2L1 3h6.7l4.7 6.1L18.3 3zm-1.2 16.2h1.5L7 4.7H5.4l11.7 14.5z" />
@@ -44,7 +36,7 @@ const Footer = () => {
   return (
     <footer className="mt-16 bg-gray-800 rounded-lg text-gray-400 text-sm">
       <p className="px-8 pt-8 text-xs text-gray-400 text-center">
-        HOME IMPROVEMENT RETAILER. {"       "} BUILDING COMFORT FOR YOUR HOME
+        HOME IMPROVEMENT COMPANY. {"       "} BUILDING COMFORT FOR YOUR HOME
       </p>
 
       <div className="flex flex-col gap-8 p-8 md:flex-row md:items-start md:justify-between">
