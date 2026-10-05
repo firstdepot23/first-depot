@@ -2,7 +2,7 @@ import { Response } from "express";
 import { Cart, CartItemDoc } from "@repo/cart-db";
 import { AuthedRequest } from "../middleware/requireAuth";
 
-const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL;
+const NEXT_PUBLIC_PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL;
 
 /**
  * Cart documents only store { productId, selectedSize, selectedColor,
@@ -15,15 +15,15 @@ const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL;
  * null and gets filtered out, instead of corrupting the whole response.
  */
 const hydrateCartItems = async (items: CartItemDoc[]) => {
-  if (!PRODUCT_SERVICE_URL) {
-    throw new Error("PRODUCT_SERVICE_URL is not set");
+  if (!NEXT_PUBLIC_PRODUCT_SERVICE_URL) {
+    throw new Error("NEXT_PUBLIC_PRODUCT_SERVICE_URL is not set");
   }
 
   const hydrated = await Promise.all(
     items.map(async (item) => {
       try {
         const res = await fetch(
-          `${PRODUCT_SERVICE_URL}/products/${item.productId}`,
+          `${NEXT_PUBLIC_PRODUCT_SERVICE_URL}/products/${item.productId}`,
         );
         if (!res.ok) return null;
 
