@@ -9,8 +9,18 @@ export const orderRoute = async (fastify: FastifyInstance) => {
     "/user-orders",
     { preHandler: shouldBeUser },
     async (request, reply) => {
-      const orders = await Order.find({ userId: request.userId });
-      return reply.send(orders);
+      try {
+        const orders = await Order.find({ userId: request.userId }).sort({
+          createdAt: -1,
+        });
+        console.log(
+          `user-orders: userId=${request.userId} found=${orders.length}`,
+        );
+        return reply.send(orders);
+      } catch (error) {
+        console.error("user-orders failed:", error);
+        return reply.status(500).send({ message: "Failed to fetch orders" });
+      }
     }
   );
   fastify.get(

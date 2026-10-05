@@ -10,9 +10,15 @@ import cors from "@fastify/cors";
 
 const fastify = Fastify();
 
+// One log line per request (skipping /health, which Render hits constantly),
+// so you can see in Render's logs whether the orders page reached this
+// service and what status it got back.
+fastify.addHook("onResponse", async (request, reply) => {
+  if (request.url === "/health") return;
+  console.log(`${request.method} ${request.url} -> ${reply.statusCode}`);
+});
+
 fastify.register(clerkPlugin);
-
-
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3004")
   .split(",")
