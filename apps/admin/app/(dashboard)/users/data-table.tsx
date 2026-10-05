@@ -87,30 +87,51 @@ export function DataTable<TData extends RowData, TValue>({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const baseUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL;
+      if (!baseUrl) {
+        throw new Error("NEXT_PUBLIC_AUTH_SERVICE_URL is not set");
+      }
+
       const token = await getToken();
+      if (!token) {
+        throw new Error("Could not verify your session");
+      }
+
       const selectedRows = table.getSelectedRowModel().rows;
 
-      Promise.all(
+      // The requests are awaited and checked. Before, Promise.all() was not
+      // awaited or returned, so "deleted successfully" showed immediately,
+      // before any request finished, and failures (403, 500) were ignored.
+      const results = await Promise.all(
         selectedRows.map(async (row) => {
           const userId = (row.original as User).id;
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_AUTH_SERVICE_URL}/users/${userId}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
+          const res = await fetch(`${baseUrl}/users/${userId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
             },
-          );
+          });
+          return res.ok;
         }),
       );
+
+      const failed = results.filter((ok) => !ok).length;
+      if (failed > 0) {
+        throw new Error(
+          `${failed} of ${results.length} user(s) could not be deleted`,
+        );
+      }
     },
     onSuccess: () => {
       toast.success("User(s) deleted successfully");
-      router.refresh();
+      setRowSelection({});
     },
     onError: (error) => {
       toast.error(error.message);
+    },
+    // Refresh either way: on a partial failure some users may be gone.
+    onSettled: () => {
+      router.refresh();
     },
   });
 

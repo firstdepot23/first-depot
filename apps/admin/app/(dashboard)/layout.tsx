@@ -6,6 +6,8 @@ import { SidebarProvider } from "../components/ui/sidebar";
 import { cookies } from "next/headers";
 import { ToastContainer } from "react-toastify";
 
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
