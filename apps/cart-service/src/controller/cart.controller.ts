@@ -2,30 +2,35 @@ import { Response } from "express";
 import { Cart, CartItemDoc } from "@repo/cart-db";
 import { AuthedRequest } from "../middleware/requireAuth";
 
-const NEXT_PUBLIC_PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL;
 
-/**
- * Cart documents only store { productId, selectedSize, selectedColor,
- * quantity } - never price/name/images. This fetches the current product
- * for each line from product-service and merges it with the stored
- * quantity/size/color, so the response shape matches what the client's
- * CartItemType already expects (full product + quantity + selections).
- *
- * A line whose product was deleted since it was added just comes back
- * null and gets filtered out, instead of corrupting the whole response.
- */
+const PRODUCT_SERVICE_URL = (
+  process.env.PRODUCT_SERVICE_URL ??
+  process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL ??
+  ""
+).replace(/\/+$/, "");
+
+
 const hydrateCartItems = async (items: CartItemDoc[]) => {
-  if (!NEXT_PUBLIC_PRODUCT_SERVICE_URL) {
-    throw new Error("NEXT_PUBLIC_PRODUCT_SERVICE_URL is not set");
+  if (!PRODUCT_SERVICE_URL) {
+    throw new Error(
+      "PRODUCT_SERVICE_URL is not set (the product service's https:// address)",
+    );
   }
 
   const hydrated = await Promise.all(
     items.map(async (item) => {
       try {
         const res = await fetch(
-          `${NEXT_PUBLIC_PRODUCT_SERVICE_URL}/products/${item.productId}`,
+          `${PRODUCT_SERVICE_URL}/products/${item.productId}`,
+          // Don't let one slow or sleeping product service hang the cart.
+          { signal: AbortSignal.timeout(10000) },
         );
-        if (!res.ok) return null;
+        if (!res.ok) {
+          console.error(
+            `Product ${item.productId} lookup returned ${res.status}`,
+          );
+          return null;
+        }
 
         const product = await res.json();
         return {
@@ -67,10 +72,7 @@ type IncomingItem = {
   quantity: number;
 };
 
-// Replaces the whole cart for this user in one write. The client always
-// sends its complete current cart (after the login merge, or after any
-// add/remove/quantity change), so "replace" is simpler and safer here
-// than trying to diff individual lines against a request body.
+
 export const saveCart = async (req: AuthedRequest, res: Response) => {
   try {
     const body = req.body as { items?: IncomingItem[] };
