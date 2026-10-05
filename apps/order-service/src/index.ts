@@ -10,9 +10,6 @@ import cors from "@fastify/cors";
 
 const fastify = Fastify();
 
-// One log line per request (skipping /health, which Render hits constantly),
-// so you can see in Render's logs whether the orders page reached this
-// service and what status it got back.
 fastify.addHook("onResponse", async (request, reply) => {
   if (request.url === "/health") return;
   console.log(`${request.method} ${request.url} -> ${reply.statusCode}`);
@@ -48,25 +45,52 @@ fastify.get(
 
 fastify.register(orderRoute);
 
-// Render injects PORT. Locally, set PORT=8001 in .env (or rely on the fallback).
+
 const port = Number(process.env.PORT) || 8001;
+
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, label: string) =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 
 const start = async () => {
   try {
-    await connectOrderDB();
-    await producer.connect();
-    await consumer.connect();
+    
+    await fastify.listen({ port, host: "0.0.0.0" });
+    console.log(`Order service is listening on port ${port}`);
 
-    await runKafkaSubscriptions();
+    
+    await withTimeout(connectOrderDB(), 60_000, "MongoDB connection");
+    console.log("MongoDB ready");
 
-    await fastify.listen({
-      port,
-      host: "0.0.0.0",
-    });
+    await withTimeout(producer.connect(), 60_000, "Kafka producer connection");
+    console.log("Kafka producer ready");
 
-    console.log(`Order service is running on port ${port}`);
+    await withTimeout(consumer.connect(), 60_000, "Kafka consumer connection");
+    console.log("Kafka consumer ready");
+
+    await withTimeout(
+      runKafkaSubscriptions(),
+      120_000,
+      "Kafka subscriptions (joining the consumer group)",
+    );
+    console.log("Order service fully started");
   } catch (err) {
-    console.log(err);
+    console.error("Order service failed to start:", err);
     process.exit(1);
   }
 };
