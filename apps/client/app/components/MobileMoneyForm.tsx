@@ -8,18 +8,6 @@ type Status = "idle" | "submitting" | "failed";
 
 const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_SERVICE_URL;
 
-/**
- * Pesapal's mobile money flow is redirect-based, not a direct USSD push
- * we trigger ourselves: /mobile-money/initiate creates a Pesapal order
- * and hands back a redirect_url to Pesapal's own hosted payment page,
- * where the customer picks MTN or Airtel Money and approves the prompt
- * on their phone. We just send the browser there. Pesapal calls our IPN
- * webhook when the payment resolves, and the customer lands back on
- * /return with the result (see page.tsx and webhooks.route.ts).
- *
- * That's why this component no longer polls a status endpoint itself -
- * there's nothing to poll until the customer comes back from Pesapal.
- */
 const MobileMoneyForm = () => {
   const { cart } = useCartStore();
   const { getToken } = useAuth();
@@ -47,9 +35,7 @@ const MobileMoneyForm = () => {
         },
         body: JSON.stringify({
           cart,
-          // Optional - overrides the phone number Clerk has on file.
-          // Pesapal also lets the customer change it on their own page,
-          // so this is a convenience, not a hard requirement.
+
           phone: phone.trim()
             ? `+256${phone.trim().replace(/^0+/, "")}`
             : undefined,
@@ -75,16 +61,26 @@ const MobileMoneyForm = () => {
   };
 
   return (
-    <div className="ml-7 flex flex-col gap-3 rounded-md border border-gray-200 p-4">
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500">Enter Phone Number</label>
-        <div className="flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm">
-          <span className="text-gray-400 mr-2">+256</span>
+    <div className="flex w-full min-w-0 flex-col gap-4 rounded-md border border-gray-200 p-3 sm:ml-7 sm:w-auto sm:p-4">
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="momoPhone"
+          className="text-xs font-medium text-gray-500"
+        >
+          Enter Phone Number
+        </label>
+        <div className="flex w-full min-w-0 items-center rounded-md border border-gray-300 px-3 py-2.5 focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+          <span className="mr-2 shrink-0 text-base text-gray-400 sm:text-sm">
+            +256
+          </span>
           <input
+            id="momoPhone"
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
             placeholder="7XXXXXXXX"
-            className="flex-1 outline-none"
+            inputMode="tel"
+            autoComplete="tel-national"
+            className="min-w-0 flex-1 bg-transparent text-base outline-none sm:text-sm"
           />
         </div>
       </div>
@@ -94,13 +90,13 @@ const MobileMoneyForm = () => {
         Pesapal&apos;s secure page.
       </p>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="break-words text-sm text-red-600">{error}</p>}
 
       <button
         type="button"
         onClick={handlePay}
         disabled={status === "submitting"}
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="w-full rounded-md bg-black px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
       >
         {status === "submitting"
           ? "Redirecting to Pesapal..."
