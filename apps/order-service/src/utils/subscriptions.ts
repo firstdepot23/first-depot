@@ -7,8 +7,18 @@ export const runKafkaSubscriptions = async () => {
     {
       topicName: "payment.successful",
       topicHandler: async (message: { value: OrderType }) => {
-        const order = message.value;
-        await createOrder(order);
+        console.log(
+          "payment.successful received:",
+          JSON.stringify(message.value),
+        );
+        try {
+          await createOrder(message.value);
+        } catch (error) {
+          console.error(
+            "Could not create order from payment.successful:",
+            error,
+          );
+        }
       },
     },
   ]);

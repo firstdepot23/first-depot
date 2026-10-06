@@ -45,9 +45,7 @@ fastify.get(
 
 fastify.register(orderRoute);
 
-
 const port = Number(process.env.PORT) || 8001;
-
 
 const withTimeout = <T>(promise: Promise<T>, ms: number, label: string) =>
   new Promise<T>((resolve, reject) => {
@@ -69,11 +67,9 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string) =>
 
 const start = async () => {
   try {
-    
     await fastify.listen({ port, host: "0.0.0.0" });
     console.log(`Order service is listening on port ${port}`);
 
-    
     await withTimeout(connectOrderDB(), 60_000, "MongoDB connection");
     console.log("MongoDB ready");
 
@@ -82,17 +78,16 @@ const start = async () => {
 
     await withTimeout(consumer.connect(), 60_000, "Kafka consumer connection");
     console.log("Kafka consumer ready");
-
-    await withTimeout(
-      runKafkaSubscriptions(),
-      120_000,
-      "Kafka subscriptions (joining the consumer group)",
-    );
-    console.log("Order service fully started");
   } catch (err) {
     console.error("Order service failed to start:", err);
     process.exit(1);
   }
+
+  // Joining the consumer group can be slow. A slow join must NOT kill the
+  // service (a restart could make us miss payment.successful messages).
+  runKafkaSubscriptions()
+    .then(() => console.log("Kafka subscriptions ready"))
+    .catch((err) => console.error("Kafka subscriptions failed:", err));
 };
 
 start();

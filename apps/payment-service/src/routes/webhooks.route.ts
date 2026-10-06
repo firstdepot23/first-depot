@@ -1,10 +1,8 @@
 import { Hono } from "hono";
-import Stripe from "stripe";
-import stripe from "../utils/stripe";
+import { PendingPayment } from "@repo/order-db";
 import { producer } from "../utils/kafka";
 import { getPesapalTransactionStatus } from "../utils/pesapal";
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET as string;
 const webhookRoute = new Hono();
 
 webhookRoute.get("/", (c) => {
@@ -15,72 +13,17 @@ webhookRoute.get("/", (c) => {
   });
 });
 
-webhookRoute.post("/stripe", async (c) => {
-  const body = await c.req.text();
-  const sig = c.req.header("stripe-signature");
-
-  let event: Stripe.Event;
-
-  try {
-    event = stripe.webhooks.constructEvent(body, sig!, webhookSecret);
-  } catch (error) {
-    console.log("Webhook verification failed!");
-    return c.json({ error: "Webhook verification failed!" }, 400);
-  }
-
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-
-      try {
-        const lineItems = await stripe.checkout.sessions.listLineItems(
-          session.id
-        );
-
-        // Awaited so a Kafka failure is caught here instead of becoming an
-        // unhandled rejection that crashes the whole service.
-        await producer.send("payment.successful", {
-          value: {
-            userId: session.client_reference_id,
-            email: session.customer_details?.email,
-            amount: session.amount_total,
-            status: session.payment_status === "paid" ? "success" : "failed",
-            paymentMethod: "stripe",
-            products: lineItems.data.map((item) => ({
-              name: item.description,
-              quantity: item.quantity,
-              price: item.price?.unit_amount,
-            })),
-          },
-        });
-      } catch (error) {
-        console.error("stripe webhook: failed to publish payment.successful:", error);
-        // A non-2xx response makes Stripe retry the webhook later.
-        return c.json({ error: "Failed to process event" }, 500);
-      }
-
-      break;
-    }
-
-    default:
-      break;
-  }
-  return c.json({ received: true });
-});
-
 // Pesapal's IPN. Registered as a GET notification type in
-// registerPesapalIpn() (utils/pesapal.ts) - if you registered yours as
-// POST instead, add a matching webhookRoute.post("/pesapal", ...) with
-// the params read from the body instead of the query string.
+// registerPesapalIpn() (utils/pesapal.ts).
 //
-// IMPORTANT: the OrderTrackingId/OrderMerchantReference Pesapal sends
-// here are just a "go check" signal, not proof of payment on their own -
-// we always re-fetch the real status via GetTransactionStatus before
-// treating anything as paid, same principle as verifying a Stripe
-// signature before trusting a webhook body.
+// The OrderTrackingId/OrderMerchantReference sent here are just a "go check"
+// signal, not proof of payment - we always re-fetch the real status via
+// GetTransactionStatus before treating anything as paid.
 webhookRoute.get("/pesapal", async (c) => {
   const orderTrackingId = c.req.query("OrderTrackingId");
   const orderMerchantReference = c.req.query("OrderMerchantReference");
+
+  console.log("pesapal IPN received:", { orderTrackingId, orderMerchantReference });
 
   if (!orderTrackingId || !orderMerchantReference) {
     return c.json(
@@ -93,26 +36,49 @@ webhookRoute.get("/pesapal", async (c) => {
     const result = await getPesapalTransactionStatus(orderTrackingId);
 
     if (result.status_code === 1) {
-      // TODO: the order service needs userId, email and products to create
-      // an order, and this message does not carry them yet. Save the user
-      // and cart when the payment is initiated (keyed by the merchant
-      // reference) and include them here.
-      await producer.send("payment.successful", {
-        value: {
-          reference: orderMerchantReference,
-          orderTrackingId,
-          amount: result.amount,
-          status: "success",
-          paymentMethod: "mobile_money",
-          // Pesapal's own payment_method (e.g. "MTNUG", "AIRTELUG") - a
-          // finer-grained operator label than the "mobile_money" rail
-          // itself, worth keeping if your order schema has room for it.
-          provider: result.payment_method,
-        },
-      });
+      // Atomically claim the pending payment so Pesapal's repeated IPN
+      // calls can't create duplicate orders.
+      const pending = await PendingPayment.findOneAndUpdate(
+        { reference: orderMerchantReference, processed: false },
+        { processed: true },
+      );
+
+      if (!pending) {
+        console.log(
+          "pesapal IPN: unknown or already processed:",
+          orderMerchantReference,
+        );
+      } else {
+        try {
+          await producer.send("payment.successful", {
+            value: {
+              userId: pending.userId,
+              email: pending.email,
+              amount: pending.amount,
+              status: "success",
+              products: pending.products.map((p) => ({
+                name: p.name,
+                quantity: p.quantity,
+                price: p.price,
+              })),
+            },
+          });
+          console.log(
+            "pesapal IPN: published payment.successful for",
+            orderMerchantReference,
+          );
+        } catch (err) {
+          // Release the claim so Pesapal's retry can succeed.
+          await PendingPayment.updateOne(
+            { reference: orderMerchantReference },
+            { processed: false },
+          );
+          throw err; // outer catch returns 500 so Pesapal retries
+        }
+      }
     } else if (result.status_code === 2 || result.status_code === 3) {
-      // Nothing consumes a "payment.failed" topic yet, and the Kafka plan
-      // limits how many topics can exist, so just log it for now.
+      // Nothing consumes a "payment.failed" topic yet (and the Kafka plan
+      // limits topics), so just log it.
       console.log(
         "Pesapal payment failed:",
         orderMerchantReference,
@@ -120,15 +86,13 @@ webhookRoute.get("/pesapal", async (c) => {
         result.payment_method,
       );
     }
-    // status_code 0 (INVALID) - Pesapal will typically call the IPN again
-    // once the transaction resolves, so there's nothing to do yet.
+    // status_code 0: still pending - Pesapal calls the IPN again on change.
   } catch (error) {
     console.error("pesapal IPN handling failed:", error);
     return c.json({ error: "Failed to process IPN" }, 500);
   }
 
-  // Pesapal expects this exact echoed shape in the 200 response to mark
-  // the IPN as delivered - returning anything else makes it keep retrying.
+  // Pesapal expects this exact echoed shape to mark the IPN as delivered.
   return c.json({
     orderNotificationType: "IPNCHANGE",
     orderTrackingId,

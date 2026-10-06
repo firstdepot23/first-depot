@@ -1,51 +1,54 @@
-export type CardChargeResult = {
-  reference: string;
-  status: "pending" | "successful" | "failed";
-};
+import {
+  getPesapalTransactionStatus,
+  PesapalBillingAddress,
+  submitPesapalOrder,
+} from "./pesapal";
+
+// Card payments go through Pesapal's hosted payment page (shown in an iframe
+// on the client). Card numbers are typed into Pesapal's page, NEVER into our
+// site, so card data never touches our frontend or servers.
 
 export type InitiateCardPaymentInput = {
-  amount: number; // UGX, whole shillings for the entire cart
-  reference: string; // your own reference id for this attempt
-  // Opaque token from the gateway's client-side tokenization - see the
-  // big comment in BankCardForm.tsx. This must never be a raw card
-  // number/CVV; if you find yourself typing `cardNumber` or `cvv` as a
-  // field here, stop and wire up the gateway's tokenization SDK instead.
-  cardToken: string;
-  cardHolder: string;
+  amount: number; // whole UGX shillings for the entire cart
+  reference: string; // our merchant reference for this attempt
+  description?: string;
+  billingAddress: PesapalBillingAddress;
 };
 
-/**
- * *** NOT YET CONFIGURED - this is a scaffold, not a working integration. ***
- *
- * Wire this to whichever Visa/Mastercard-accepting gateway you build
- * against (DPO Group, Network International, Pesapal, and Flutterwave
- * all accept cards in Uganda). Exchange `cardToken` for a real charge
- * via that provider's server-side "charge with token" API and return a
- * reference you can poll/verify.
- *
- * Once you've picked one and have API credentials:
- * 1. Add the credentials as env vars here (e.g. CARD_GATEWAY_API_KEY,
- *    CARD_GATEWAY_SECRET).
- * 2. Replace the body of this function with that provider's charge call.
- * 3. Do the same for getCardPaymentStatus below, or better, have the
- *    gateway call a webhook route here instead of polling - the same
- *    way Stripe's webhook works elsewhere in this project.
- */
+export type CardChargeResult = {
+  reference: string; // Pesapal order tracking id
+  status: "pending" | "successful" | "failed";
+  redirectUrl?: string; // Pesapal hosted payment page - load it in an iframe
+};
+
 export const initiateCardPayment = async (
   input: InitiateCardPaymentInput,
 ): Promise<CardChargeResult> => {
-  throw new Error(
-    "Card gateway is not configured yet. See utils/bankCard.ts for setup instructions.",
-  );
+  const order = await submitPesapalOrder({
+    id: input.reference,
+    amount: input.amount,
+    description: input.description ?? `Order ${input.reference}`,
+    billingAddress: input.billingAddress,
+  });
+
+  return {
+    reference: order.order_tracking_id,
+    status: "pending",
+    redirectUrl: order.redirect_url,
+  };
 };
 
-/**
- * *** NOT YET CONFIGURED - see initiateCardPayment above. ***
- */
 export const getCardPaymentStatus = async (
-  reference: string,
+  orderTrackingId: string,
 ): Promise<CardChargeResult> => {
-  throw new Error(
-    "Card gateway is not configured yet. See utils/bankCard.ts for setup instructions.",
-  );
+  const result = await getPesapalTransactionStatus(orderTrackingId);
+
+  const status: CardChargeResult["status"] =
+    result.status_code === 1
+      ? "successful"
+      : result.status_code === 2 || result.status_code === 3
+        ? "failed"
+        : "pending";
+
+  return { reference: orderTrackingId, status };
 };

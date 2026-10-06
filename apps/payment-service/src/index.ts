@@ -1,19 +1,16 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { clerkMiddleware } from "@hono/clerk-auth";
-import sessionRoute from "./routes/session.route.js";
 import { cors } from "hono/cors";
-import { consumer, producer } from "./utils/kafka.js";
-import { runKafkaSubscriptions } from "./utils/subscriptions.js";
+import { connectOrderDB } from "@repo/order-db";
+import { producer } from "./utils/kafka.js";
 import webhookRoute from "./routes/webhooks.route.js";
 import mobileMoneyRoute from "./routes/mobilemoney.route.js";
 import bankCardRoute from "./routes/bankcard.route.js";
 
 const app = new Hono();
 
-// Comma-separated list, e.g.
-// ALLOWED_ORIGINS=https://your-client.onrender.com,https://your-admin.onrender.com
-// (no spaces, no trailing slashes). Falls back to localhost for local dev.
+// Comma-separated list, no spaces, no trailing slashes. Falls back to localhost.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3004")
   .split(",")
   .map((origin) => origin.trim())
@@ -32,25 +29,30 @@ app.get("/health", (c) => {
   });
 });
 
-app.route("/sessions", sessionRoute);
 app.route("/webhooks", webhookRoute);
 app.route("/mobile-money", mobileMoneyRoute);
 app.route("/bank-card", bankCardRoute);
 
-// Render injects PORT. Locally, set PORT=8002 in .env (or rely on the fallback).
 const port = Number(process.env.PORT) || 8002;
+
+// Listen first so the host (Render) sees the port immediately.
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`Payment service is running on port ${port}`);
+});
 
 const start = async () => {
   try {
-    // Connect both at once; if either fails we jump to the catch below.
-    await Promise.all([producer.connect(), consumer.connect()]);
-    await runKafkaSubscriptions();
+    // MongoDB: used to store pending payments (user + cart) between
+    // payment initiation and the Pesapal IPN.
+    await connectOrderDB();
+    console.log("MongoDB ready");
 
-    serve({ fetch: app.fetch, port }, () => {
-      console.log(`Payment service is running on port ${port}`);
-    });
+    await producer.connect();
+    console.log("Kafka producer ready");
+
+    console.log("Payment service fully started");
   } catch (error) {
-    console.log(error);
+    console.error("Payment service failed to start:", error);
     process.exit(1);
   }
 };
