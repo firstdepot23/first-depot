@@ -104,7 +104,7 @@ const CardList = async ({ title }: { title: string }) => {
                     {item.name}
                   </CardTitle>
                 </CardContent>
-                <CardFooter className="p-0">UGX {item.price}K</CardFooter>
+                <CardFooter className="p-0">UGX {item.price}</CardFooter>
               </Card>
             ))
           : orders.map((item) => (
