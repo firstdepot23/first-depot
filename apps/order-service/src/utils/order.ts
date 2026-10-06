@@ -13,13 +13,21 @@ export const createOrder = async (order: OrderType) => {
 
   const newOrder = new Order(order);
 
+  let saved;
   try {
-    const saved = await newOrder.save();
+    saved = await newOrder.save();
     console.log(
       `Order saved: id=${saved._id} userId=${userId ?? "MISSING"} email=${saved.email}`,
     );
+  } catch (error) {
+    console.error("createOrder failed:", error);
+    throw error;
+  }
 
-    producer.send("order.created", {
+  // The order is already stored; a failure to announce it must not
+  // crash the process or be reported as a failed order.
+  try {
+    await producer.send("order.created", {
       value: {
         email: saved.email,
         amount: saved.amount,
@@ -27,7 +35,6 @@ export const createOrder = async (order: OrderType) => {
       },
     });
   } catch (error) {
-    console.error("createOrder failed:", error);
-    throw error;
+    console.error("order.created publish failed (order itself was saved):", error);
   }
 };

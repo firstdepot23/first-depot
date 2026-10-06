@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { shouldBeUser } from "../middleware/authMiddleware";
 import { CartItemsType } from "@repo/types";
+import { PendingPayment } from "@repo/order-db";
 import { getMobileMoneyStatus, initiateMobileMoneyPayment } from "../utils/mobileMoney";
 import clerkClient from "../utils/clerk";
 
@@ -22,7 +23,6 @@ mobileMoneyRoute.post("/initiate", shouldBeUser, async (c) => {
       return c.json({ error: "Cart is empty" }, 400);
     }
 
-  
     const user = await clerkClient.users.getUser(userId);
     const email =
       user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
@@ -38,13 +38,26 @@ mobileMoneyRoute.post("/initiate", shouldBeUser, async (c) => {
     const amount = calculateTotal(cart);
     const reference = `mm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+    // Remember who is paying and what they bought. The Pesapal IPN only
+    // carries the reference, so the webhook reads this back to build the order.
+    await PendingPayment.create({
+      reference,
+      userId,
+      email,
+      amount,
+      products: cart.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    });
+
     const result = await initiateMobileMoneyPayment({
       amount,
       reference,
       description: `Order ${reference}`,
       billingAddress: {
         email_address: email,
-     
         phone_number: phone || user.phoneNumbers[0]?.phoneNumber,
         first_name: user.firstName ?? undefined,
         last_name: user.lastName ?? undefined,
