@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import FrameBreakout from "../components/FrameBreakout";
 
 const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL;
 
@@ -15,7 +16,7 @@ const OrdersLink = ({ children }: { children: React.ReactNode }) => (
   </Link>
 );
 
-const ReturnPage = async ({
+const renderContent = async ({
   searchParams,
 }: {
   searchParams: Promise<SearchParams> | undefined;
@@ -121,5 +122,14 @@ const ReturnPage = async ({
     );
   }
 };
+
+const ReturnPage = async (props: {
+  searchParams: Promise<SearchParams> | undefined;
+}) => (
+  <>
+    <FrameBreakout />
+    {await renderContent(props)}
+  </>
+);
 
 export default ReturnPage;
