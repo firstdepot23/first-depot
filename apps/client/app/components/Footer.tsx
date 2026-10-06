@@ -13,7 +13,7 @@ const Footer = () => {
         {/* LINE 1: TAGLINE */}
         <p className="text-xs text-gray-500 text-center tracking-wide">
           HOME IMPROVEMENT COMPANY. &nbsp;&nbsp;&nbsp; BUILDING COMFORT FOR YOUR
-          HOME
+          HOME.
         </p>
 
         {/* LINE 2: COMPANY DOCS + COPYRIGHT */}
