@@ -2,13 +2,12 @@
 
 import { ShippingFormInputs } from "@repo/types";
 import { useState } from "react";
-import { CreditCard, Smartphone, Wallet } from "lucide-react";
-import StripePaymentForm from "./StripePaymentForm";
+import { CreditCard, Smartphone } from "lucide-react";
 import MobileMoneyForm from "./MobileMoneyForm";
 import BankCardForm from "./BankCardForm";
 import useCartStore from "../stores/storeCart";
 
-type PaymentMethod = "mobile_money" | "bank_card" | "stripe";
+type PaymentMethod = "mobile_money" | "bank_card";
 
 const OPTIONS: {
   id: PaymentMethod;
@@ -28,21 +27,13 @@ const OPTIONS: {
     subtitle: "Visa, Mastercard",
     Icon: CreditCard,
   },
-  {
-    id: "stripe",
-    title: "Pay with Stripe",
-    subtitle: "International cards via Stripe",
-    Icon: Wallet,
-  },
 ];
 
-// Three separate payment rails: Mobile Money and Bank Card go through
-// your own gateways (both scaffolded, not yet configured), Stripe stays
-// on the existing working flow under its own explicit option.
-const PaymentMethodSelector = ({
-  shippingForm,
-}: {
-  shippingForm: ShippingFormInputs;
+// `shippingForm` is no longer used here (it was only needed by the Stripe
+// form). It's kept as an optional prop so the parent page that still passes
+// it keeps compiling; you can remove it from the parent whenever convenient.
+const PaymentMethodSelector = (_props: {
+  shippingForm?: ShippingFormInputs;
 }) => {
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const { cart } = useCartStore();
@@ -52,12 +43,7 @@ const PaymentMethodSelector = ({
   const renderForm = (id: PaymentMethod) => {
     if (method !== id) return null;
     if (id === "mobile_money") return <MobileMoneyForm />;
-    if (id === "bank_card") return <BankCardForm />;
-    return (
-      <div className="w-full min-w-0 sm:ml-7 sm:w-auto">
-        <StripePaymentForm shippingForm={shippingForm} />
-      </div>
-    );
+    return <BankCardForm />;
   };
 
   return (

@@ -6,7 +6,7 @@ import useCartStore from "../stores/storeCart";
 
 type Status = "idle" | "submitting" | "failed";
 
-const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_SERVICE_URL;
+const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL;
 
 const MobileMoneyForm = () => {
   const { cart } = useCartStore();

@@ -7,7 +7,7 @@ import useCartStore from "../stores/storeCart";
 type Status =
   "idle" | "tokenizing" | "submitting" | "pending" | "successful" | "failed";
 
-const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_SERVICE_URL;
+const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL;
 
 const inputClass =
   "w-full min-w-0 rounded-md border border-gray-300 px-3 py-2.5 text-base outline-none focus:border-black focus:ring-1 focus:ring-black sm:text-sm";
