@@ -2,11 +2,7 @@ export type Result<T> =
   | { ok: true; data: T }
   | { ok: false; message: string };
 
-/**
- * fetch + JSON that never throws. Always resolves to a Result so the UI can
- * show a proper message for network failures, timeouts, auth problems and
- * bad server responses instead of crashing.
- */
+
 export async function safeFetch<T>(
   url: string,
   init: RequestInit = {},

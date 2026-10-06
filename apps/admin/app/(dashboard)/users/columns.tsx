@@ -18,14 +18,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { User } from "@clerk/nextjs/server";
 
-/*export type User = {
-  id: string;
-  avatar: string;
-  fullName: string;
-  email: string;
-  status: "active" | "inactive";
-}; */
-
 export const columns: ColumnDef<DataTableFeatures, User>[] = [
   {
     id: "select",
