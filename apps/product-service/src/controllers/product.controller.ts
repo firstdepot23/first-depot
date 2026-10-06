@@ -1,7 +1,5 @@
 import { Request, Response } from "express";
 import { prisma, Prisma } from "@repo/product-db";
-import { producer } from "../utils/kafka";
-import { StripeProductType } from "@repo/types";
 
 export const createProduct = async (req: Request, res: Response) => {
   try {
@@ -25,24 +23,6 @@ export const createProduct = async (req: Request, res: Response) => {
     }
 
     const product = await prisma.product.create({ data });
-
-    const stripeProduct: StripeProductType = {
-      id: product.id.toString(),
-      name: product.name,
-      price: product.price,
-    };
-
-    // The send is now awaited. Before, producer.send() returned a promise
-    // that nothing waited for, so the try/catch never caught a failure and
-    // a broker problem became an unhandled rejection, which crashes Node
-    // (and Render answers 502 until the service restarts).
-    // The product is already saved, so a Kafka failure is logged instead of
-    // turning the request into an error.
-    try {
-      await producer.send("product.created", { value: stripeProduct });
-    } catch (kafkaError) {
-      console.error("Failed to publish product.created:", kafkaError);
-    }
 
     return res.status(201).json(product);
   } catch (error) {
@@ -83,14 +63,6 @@ export const deleteProduct = async (req: Request, res: Response) => {
     const deletedProduct = await prisma.product.delete({
       where: { id: Number(id) },
     });
-
-    // Awaited and caught separately: the product is already deleted, so a
-    // Kafka failure must not crash the service or report the delete as failed.
-    try {
-      await producer.send("product.deleted", { value: Number(id) });
-    } catch (kafkaError) {
-      console.error("Failed to publish product.deleted:", kafkaError);
-    }
 
     return res.status(200).json(deletedProduct);
   } catch (error) {
@@ -151,7 +123,11 @@ export const getProducts = async (req: Request, res: Response) => {
     return res.status(200).json(products);
   } catch (error) {
     console.error("getProducts failed:", error);
-    return res.status(200).json([]);
+    // 503 (not an empty 200) so the client can retry instead of showing
+    // "No products found" when the database is merely slow or waking up.
+    return res
+      .status(503)
+      .json({ message: "Products are temporarily unavailable" });
   }
 };
 

@@ -8,6 +8,43 @@ import RetryButton from "./RetryButton";
 type FetchResult =
   { ok: true; products: ProductType[] } | { ok: false; message: string };
 
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The product service can be asleep or restarting (Render answers 502/503
+// while that happens). Retry a few times with a short pause so the page
+// loads on its own instead of showing an error on the first hit.
+const fetchWithRetry = async (url: string, attempts = 3): Promise<Response> => {
+  let lastResponse: Response | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const res = await fetch(url, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok || !RETRYABLE_STATUSES.has(res.status)) return res;
+      lastResponse = res;
+      lastError = undefined;
+      console.error(
+        `Product service responded with ${res.status} (attempt ${attempt}/${attempts})`,
+      );
+    } catch (error) {
+      lastError = error;
+      lastResponse = undefined;
+      console.error(
+        `Product service request failed (attempt ${attempt}/${attempts}):`,
+        error,
+      );
+    }
+    if (attempt < attempts) await sleep(2000 * attempt);
+  }
+
+  if (lastResponse) return lastResponse;
+  throw lastError;
+};
+
 const fetchData = async ({
   category,
   sort,
@@ -37,11 +74,7 @@ const fetchData = async ({
   if (params === "homepage") query.set("limit", "8");
 
   try {
-    const res = await fetch(`${baseUrl}/products?${query.toString()}`, {
-      cache: "no-store",
-      // Fail fast (8s) instead of hanging the whole page for 10s+ on a dead server.
-      signal: AbortSignal.timeout(8000),
-    });
+    const res = await fetchWithRetry(`${baseUrl}/products?${query.toString()}`);
 
     if (!res.ok) {
       console.error(`Product service responded with ${res.status}`);
