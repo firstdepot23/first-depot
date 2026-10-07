@@ -9,6 +9,7 @@
   "dependencies": {
     "@repo/order-db": "*",
     "@repo/product-db": "*",
+    "@repo/blog-db": "*",
     "zod": "^4.6.5"
   },
   "devDependencies": {
