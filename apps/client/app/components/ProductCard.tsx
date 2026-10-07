@@ -12,11 +12,9 @@ import ColorSelect from "./ColorSelect";
 import QuantityStepper from "./QuantityStepper";
 
 /**
- * One row = one product, spanning the full width of the list (see the
- * Item Table / cart-row references this was built from) instead of a
- * boxed grid card. This is what keeps things compact on mobile too: a
- * fixed-size thumbnail next to text that wraps, rather than a big square
- * image stacked on top of everything else.
+ * One row per product, ruled like the blog listing: a soft mint thumbnail,
+ * a confident title that turns green on hover, and the price + action in a
+ * column on the right (own line under the details on phones).
  */
 const ProductCard = ({ product }: { product: ProductType }) => {
   const [productTypes, setProductTypes] = useState({
@@ -73,10 +71,13 @@ const ProductCard = ({ product }: { product: ProductType }) => {
   };
 
   return (
-    <div className="flex items-center gap-3 sm:gap-5 py-3 sm:py-4 border-b border-gray-100 last:border-0">
-      {/* THUMBNAIL - fixed, modest size so it never dominates the row */}
+    // Phones: a two-column grid (thumbnail | details) with the price + action
+    // on their own full-width row underneath, so nothing can push past the
+    // screen edge. sm and up: the original single row.
+    <article className="group grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 gap-y-4 border-t border-gray-200 py-5 last:border-b sm:flex sm:items-center sm:gap-6 sm:py-7 md:px-8">
+      {/* THUMBNAIL */}
       <Link href={`/products/${product.id}`} className="shrink-0">
-        <div className="relative w-16 h-16 sm:w-24 sm:h-24 bg-gray-50 rounded-md overflow-hidden">
+        <div className="relative h-20 w-20 overflow-hidden rounded-xl bg-green-50 shadow-lg shadow-gray-900/5 ring-1 ring-green-900/5 sm:h-28 sm:w-28">
           <Image
             src={
               (product.images as Record<string, string>)?.[
@@ -85,79 +86,77 @@ const ProductCard = ({ product }: { product: ProductType }) => {
             }
             alt={product.name}
             fill
-            className="object-contain p-1.5 sm:p-2"
+            className="object-contain p-2 transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none sm:p-3"
           />
         </div>
       </Link>
 
-      {/* DETAILS - wraps under itself on mobile instead of overflowing */}
-      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
-        <div className="flex-1 min-w-0">
-          <Link href={`/products/${product.id}`}>
-            <h3 className="font-medium text-sm leading-snug line-clamp-2">
-              {product.name}
-            </h3>
-          </Link>
-          <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 hidden sm:block">
-            {product.shortDescription}
-          </p>
+      {/* DETAILS */}
+      <div className="min-w-0 sm:flex-1">
+        <Link href={`/products/${product.id}`}>
+          <h3 className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-gray-900 transition-colors [overflow-wrap:anywhere] hover:text-green-700 sm:text-lg">
+            {product.name}
+          </h3>
+        </Link>
+        <p className="mt-1 hidden line-clamp-2 text-sm leading-relaxed text-gray-500 [overflow-wrap:anywhere] sm:block">
+          {product.shortDescription}
+        </p>
 
-          {/* SIZE / COLOR - compact inline controls, not their own block */}
-          <div className="flex items-center gap-2.5 mt-1.5 text-xs">
-            <select
-              value={productTypes.size}
-              className="ring-1 ring-gray-200 rounded px-1.5 py-0.5 text-xs bg-white"
-              onChange={(e) =>
-                handleProductType({ type: "size", value: e.target.value })
-              }
-            >
-              {product.sizes.map((size) => (
-                <option key={size} value={size}>
-                  {size.toUpperCase()}
-                </option>
-              ))}
-            </select>
+        {/* SIZE / COLOR: wraps onto a new line instead of running off-screen */}
+        <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+          <select
+            value={productTypes.size}
+            aria-label="Size"
+            className="max-w-[10rem] cursor-pointer truncate rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 outline-none transition-colors hover:border-gray-400 focus-visible:border-green-600 focus-visible:ring-2 focus-visible:ring-green-600/30"
+            onChange={(e) =>
+              handleProductType({ type: "size", value: e.target.value })
+            }
+          >
+            {product.sizes.map((size) => (
+              <option key={size} value={size}>
+                {size.toUpperCase()}
+              </option>
+            ))}
+          </select>
 
-            <div className="flex items-center">
-              <ColorSelect
-                colors={product.colors}
-                value={productTypes.color}
-                onChange={(value) =>
-                  handleProductType({ type: "color", value })
-                }
-                size="sm"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* PRICE + CTA - right-aligned column on desktop, own row on mobile */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 sm:w-40 shrink-0">
-          <p className="font-semibold text-sm sm:text-base whitespace-nowrap">
-            UGX {product.price.toLocaleString()}
-          </p>
-
-          {isSignedIn && cartQuantity > 0 ? (
-            <QuantityStepper
-              size="sm"
-              quantity={cartQuantity}
-              // Minus at 1 removes the item, returning to "Add to Cart".
-              onDecrease={() => updateQuantity(cartVariant, cartQuantity - 1)}
-              onIncrease={() => updateQuantity(cartVariant, cartQuantity + 1)}
-            />
-          ) : (
-            <button
-              onClick={handleAddToCart}
-              aria-label="Add to cart"
-              className="ring-1 ring-gray-200 rounded-md p-2 sm:px-3 sm:py-1.5 text-sm cursor-pointer hover:text-white hover:bg-black transition-all duration-200 flex items-center gap-2 shrink-0"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              <span className="hidden sm:inline">Add to Cart</span>
-            </button>
-          )}
+          <ColorSelect
+            colors={product.colors}
+            value={productTypes.color}
+            onChange={(value) => handleProductType({ type: "color", value })}
+            size="sm"
+          />
         </div>
       </div>
-    </div>
+
+      {/* PRICE + ACTION: full-width row on phones, right-hand column on sm+ */}
+      <div className="col-span-2 flex min-w-0 items-center justify-between gap-3 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end">
+        <p className="min-w-0 text-gray-900">
+          <span className="mr-1 text-xs font-medium text-gray-500">UGX</span>
+          <span className="text-lg font-semibold tracking-tight sm:text-xl">
+            {product.price.toLocaleString()}
+          </span>
+        </p>
+
+        {isSignedIn && cartQuantity > 0 ? (
+          <QuantityStepper
+            size="sm"
+            quantity={cartQuantity}
+            // Minus at 1 removes the item, returning to "Add to Cart".
+            onDecrease={() => updateQuantity(cartVariant, cartQuantity - 1)}
+            onIncrease={() => updateQuantity(cartVariant, cartQuantity + 1)}
+          />
+        ) : (
+          <button
+            onClick={handleAddToCart}
+            aria-label="Add to cart"
+            className="flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-gray-900 px-5 text-sm font-medium text-white transition-colors hover:bg-green-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Add to Cart
+          </button>
+        )}
+      </div>
+    </article>
   );
 };
 

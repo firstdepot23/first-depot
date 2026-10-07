@@ -7,6 +7,7 @@ import AppPieChart from "../components/AppPieChart";
 import CardList from "../components/CardList";
 import TodoList from "../components/TodoList";
 import { safeFetch, type Result } from "../lib/safeFetch";
+import { requireAdmin } from "../lib/requireAdmin";
 
 const getOrderChart = async (): Promise<Result<OrderChartType[]>> => {
   const baseUrl = process.env.NEXT_PUBLIC_ORDER_SERVICE_URL;
@@ -55,7 +56,9 @@ const ChartSkeleton = () => (
   </div>
 );
 
-const Homepage = () => {
+const Homepage = async () => {
+  await requireAdmin();
+
   // Not awaited: the page renders immediately and the chart streams in.
   const orderChartData = getOrderChart();
 

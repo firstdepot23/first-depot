@@ -7,6 +7,8 @@ import SecondaryNavbar from "./components/SecondaryNavbar";
 import { ToastContainer } from "react-toastify";
 import { ClerkProvider } from "@clerk/nextjs";
 import CartSync from "./components/CartSync";
+import NavigationProgress from "./components/NavigationProgress";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +40,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       >
         <body className="min-h-dvh flex flex-col overflow-x-clip text-base">
           <CartSync />
+          {/* useSearchParams inside needs a Suspense boundary */}
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
           {/* w-full is essential: in a flex-col body, mx-auto makes this
               shrink to its content width instead of filling the screen. */}
           <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col px-4 py-4 sm:px-6 lg:px-8">

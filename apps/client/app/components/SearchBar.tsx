@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ProductType } from "@repo/types";
 import { categories } from "../data/categoryData";
+import { startLoader } from "./NavigationProgress";
 
 /**
  * Collapsed: a single round search icon that sits in the navbar.
@@ -153,6 +154,7 @@ const SearchBar = () => {
       params.delete("category");
     }
 
+    startLoader();
     router.push(`/products?${params.toString()}`, { scroll: false });
     closeSearch(); // navbar goes back to normal, input is cleared
   };
