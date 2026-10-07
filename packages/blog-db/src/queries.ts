@@ -36,8 +36,10 @@ const toPlain = (d: LeanPost): BlogPostPlain => ({
 
 // Live on the site: published, and the publish date has arrived
 // (a future date works as "scheduled").
+// `as const` keeps status as the literal "published" instead of widening it to
+// `string`; mongoose 9's filter types only accept "draft" | "published" here.
 const livePosts = () => ({
-  status: "published",
+  status: "published" as const,
   publishedAt: { $lte: new Date() },
 });
 
