@@ -24,58 +24,48 @@ const NAV: NavItem[] = [
         links: [
           {
             label: "Cement & concrete",
-            href: "/?category=cement",
+            href: "/products?search=cement",
             desc: "Foundations and walls",
           },
           {
             label: "Timber & boards",
-            href: "/?category=timber",
+            href: "/products?search=timber",
             desc: "Frames, ceilings, joinery",
           },
           {
             label: "Roofing",
-            href: "/?category=roofing",
+            href: "/products?search=roofing",
             desc: "Sheets, tiles and fixings",
           },
           {
             label: "Paints & finishes",
-            href: "/?category=paints",
+            href: "/products?search=paints",
             desc: "Interior and exterior",
-          },
-          {
-            label: "Metalwork & fencing",
-            href: "/?category=metalwork",
-            desc: "Structural components and barriers",
           },
         ],
       },
       {
-        title: "Home improvement",
+        title: "Interiors",
         links: [
           {
             label: "Flooring & tiles",
-            href: "/?category=tiles",
+            href: "/products?search=tiles",
             desc: "Floors, walls, splashbacks",
           },
           {
             label: "Kitchen & bath",
-            href: "/?category=kitchen-bath",
+            href: "/products?search=kitchen-bath",
             desc: "Taps, sinks, fittings",
           },
           {
             label: "Lighting",
-            href: "/?category=lighting",
+            href: "/products?search=lighting",
             desc: "Indoor and outdoor",
           },
           {
             label: "Furniture",
-            href: "/?category=furniture",
+            href: "/products?search=furniture",
             desc: "Comfort for every room",
-          },
-          {
-            label: "Accessories & decor",
-            href: "/?category=accessories",
-            desc: "Scent for every room",
           },
         ],
       },
@@ -84,22 +74,22 @@ const NAV: NavItem[] = [
         links: [
           {
             label: "Power tools",
-            href: "/?category=power-tools",
+            href: "/products?search=power-tools",
             desc: "Drills, saws, grinders",
           },
           {
             label: "Hand tools",
-            href: "/?category=hand-tools",
+            href: "/products?search=hand-tools",
             desc: "The everyday essentials",
           },
           {
             label: "Plumbing",
-            href: "/?category=plumbing",
+            href: "/products?search=plumbing",
             desc: "Pipes, valves, tanks",
           },
           {
             label: "Electrical",
-            href: "/?category=electrical",
+            href: "/products?search=electrical",
             desc: "Cables, switches, boards",
           },
         ],
@@ -118,10 +108,10 @@ const NAV: NavItem[] = [
       {
         title: "By room",
         links: [
-          { label: "Kitchen", href: "/?category=kitchen-bath" },
-          { label: "Bathroom", href: "/?category=kitchen-bath" },
-          { label: "Living room", href: "/?category=furniture" },
-          { label: "Outdoor & garden", href: "/?category=outdoor" },
+          { label: "Kitchen", href: "/blog?category=kitchen-bath" },
+          { label: "Bathroom", href: "/blog?category=kitchen-bath" },
+          { label: "Living room", href: "/blog?category=furniture" },
+          { label: "Outdoor & garden", href: "/blog?category=outdoor" },
         ],
       },
       {
@@ -129,8 +119,8 @@ const NAV: NavItem[] = [
         links: [
           { label: "New build", href: "/blog?category=Guides" },
           { label: "Renovation", href: "/blog?category=Projects" },
-          { label: "Painting", href: "/?category=paints" },
-          { label: "Roofing", href: "/?category=roofing" },
+          { label: "Painting", href: "/blog?category=Product" },
+          { label: "Roofing", href: "/blog?category=Industry" },
         ],
       },
     ],
@@ -186,6 +176,9 @@ const SecondaryNavbar = () => {
   const pathname = usePathname();
   const rootRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // After clicking a link the pointer is still over the bar; don't let that
+  // hover pop the menu straight back open while the next page loads.
+  const ignoreHover = useRef(false);
 
   const [open, setOpen] = useState<string | null>(null); // desktop dropdown
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -194,6 +187,7 @@ const SecondaryNavbar = () => {
   const closeAll = () => {
     setOpen(null);
     setMobileOpen(false);
+    setMobileSection(null);
   };
 
   // Close on navigation
@@ -212,10 +206,12 @@ const SecondaryNavbar = () => {
       }
     };
     document.addEventListener("keydown", onKey);
+    window.addEventListener("popstate", closeAll);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("touchstart", onDown);
     return () => {
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", closeAll);
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("touchstart", onDown);
     };
@@ -227,6 +223,10 @@ const SecondaryNavbar = () => {
   const scheduleClose = () => {
     cancelClose();
     closeTimer.current = setTimeout(() => setOpen(null), 150);
+  };
+  const onLeave = () => {
+    ignoreHover.current = false;
+    scheduleClose();
   };
 
   const isActive = (item: NavItem) => {
@@ -264,6 +264,17 @@ const SecondaryNavbar = () => {
 
       <div
         ref={rootRef}
+        id="site-subnav"
+        onClick={(e) => {
+          // Close the moment a link is clicked, not when the next page has
+          // finished loading (which can take a while, or never happen for
+          // links that only change the query string, like /?category=paints).
+          if ((e.target as Element).closest("a")) {
+            ignoreHover.current = true;
+            cancelClose();
+            closeAll();
+          }
+        }}
         className="sticky top-0 z-40 border-b border-gray-200 bg-white/90 backdrop-blur"
       >
         <nav aria-label="Explore" className="relative">
@@ -271,7 +282,7 @@ const SecondaryNavbar = () => {
           <div
             className="hidden h-12 items-center justify-between md:flex"
             onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
+            onMouseLeave={onLeave}
           >
             <ul className="flex items-center gap-1">
               {NAV.map((item) => (
@@ -293,8 +304,13 @@ const SecondaryNavbar = () => {
                       className={triggerClass(item)}
                       aria-expanded={open === item.label}
                       aria-haspopup="true"
-                      onMouseEnter={() => setOpen(item.label)}
-                      onClick={() => setOpen(item.label)}
+                      onMouseEnter={() => {
+                        if (!ignoreHover.current) setOpen(item.label);
+                      }}
+                      onClick={() => {
+                        ignoreHover.current = false;
+                        setOpen(item.label);
+                      }}
                     >
                       {item.label}
                       <Chevron
@@ -318,7 +334,7 @@ const SecondaryNavbar = () => {
           <div
             className="hidden md:block"
             onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
+            onMouseLeave={onLeave}
           >
             {NAV.filter((i) => i.columns).map((item) => {
               const shown = open === item.label;

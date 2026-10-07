@@ -32,7 +32,7 @@ const ColorSelect = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
@@ -41,8 +41,20 @@ const ColorSelect = ({
         setSearch("");
       }
     };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setSearch("");
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
   const filteredColors = useMemo(() => {
@@ -55,11 +67,15 @@ const ColorSelect = ({
     size === "sm" ? "text-xs px-2 py-1" : "text-sm px-3 py-1.5";
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div
+      className={`relative min-w-0 max-w-full ${open ? "w-full sm:w-auto" : ""}`}
+      ref={containerRef}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 rounded-md ring-1 ring-gray-200 bg-white hover:ring-gray-300 transition-colors ${triggerPadding}`}
+        className={`inline-flex max-w-full items-center gap-1.5 rounded-md ring-1 ring-gray-200 bg-white hover:ring-gray-300 transition-colors ${triggerPadding}`}
+        aria-expanded={open}
       >
         <span
           className="w-3.5 h-3.5 rounded-full border border-gray-200 shrink-0"
@@ -70,7 +86,7 @@ const ColorSelect = ({
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-64 rounded-md border border-gray-200 bg-white shadow-lg p-2.5">
+        <div className="z-20 mt-1.5 w-full rounded-md border border-gray-200 bg-white p-2.5 shadow-lg sm:absolute sm:left-0 sm:w-64">
           {/* Only worth a search box once there's actually something to
               search through - a 2-3 color product doesn't need one. */}
           {colors.length > 6 && (
@@ -103,7 +119,7 @@ const ColorSelect = ({
                       setOpen(false);
                       setSearch("");
                     }}
-                    className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
+                    className={`flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-left text-xs transition-colors ${
                       isSelected
                         ? "border-gray-800 bg-gray-50"
                         : "border-gray-200 hover:bg-gray-50"

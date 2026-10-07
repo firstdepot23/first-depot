@@ -4,6 +4,7 @@ import ProductCard from "./ProductCard";
 import Link from "next/link";
 import Filter from "./Filter";
 import RetryButton from "./RetryButton";
+import { categories } from "../data/categoryData";
 
 type FetchResult =
   { ok: true; products: ProductType[] } | { ok: false; message: string };
@@ -103,6 +104,21 @@ const fetchData = async ({
   }
 };
 
+const Chevron = () => (
+  <svg
+    viewBox="0 0 16 16"
+    className="h-3 w-3"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M6 3l5 5-5 5" />
+  </svg>
+);
+
 const ProductList = async ({
   category,
   sort,
@@ -116,44 +132,87 @@ const ProductList = async ({
 }) => {
   const result = await fetchData({ category, sort, search, params });
 
+  const categoryName = category
+    ? (categories.find((c) => c.slug === category)?.name ?? category)
+    : undefined;
+
+  // Heading follows what the visitor is looking at.
+  const title = search
+    ? `Results for \u201C${search}\u201D`
+    : (categoryName ??
+      (params === "homepage" ? "New arrivals" : "All products"));
+
+  const subtitle = !result.ok
+    ? "Everything you need to build comfort at home."
+    : params === "homepage"
+      ? "Fresh stock for building comfort at home."
+      : `${result.products.length} ${
+          result.products.length === 1 ? "product" : "products"
+        }${categoryName && search ? ` in ${categoryName}` : ""}`;
+
   return (
-    <div className="w-full">
+    <section className="w-full pb-4">
       {/*<Categories />
       {params === "products" && <Filter />}*/}
 
-      <div className="flex flex-col divide-y divide-gray-100 mt-3">
-        {!result.ok ? (
-          <div
-            role="alert"
-            className="py-12 flex flex-col items-center gap-3 text-center"
-          >
-            <p className="text-base font-medium text-gray-800">
-              Unable to load products
-            </p>
-            <p className="text-sm text-gray-500 max-w-md">{result.message}</p>
-            <RetryButton />
-          </div>
-        ) : result.products.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-500">
-            No products found.
-          </p>
-        ) : (
-          result.products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))
-        )}
-      </div>
+      {/* HEADER: same voice as the blog */}
+      <header className="pb-6 pt-6 sm:pb-8 sm:pt-10">
+        <p className="border-l-2 border-green-600 pl-3 text-sm font-medium text-green-600">
+          {params === "homepage" ? "Just in" : "Shop"}
+        </p>
+        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-gray-900 [overflow-wrap:anywhere] sm:text-6xl">
+          {title}
+        </h1>
+        <p className="mt-3 max-w-md text-base text-gray-500">{subtitle}</p>
+      </header>
 
-      <Link
-        href={category ? `/products/?category=${category}` : "/products"}
-        className="flex justify-end mt-4 underline text-sm text-gray-500"
-      >
-        View all products
-      </Link>
-    </div>
+      {/* LIST */}
+      {!result.ok ? (
+        <div
+          role="alert"
+          className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-6 py-14 text-center"
+        >
+          <p className="text-lg font-semibold text-gray-900">
+            Unable to load products
+          </p>
+          <p className="max-w-md text-sm text-gray-500">{result.message}</p>
+          <RetryButton />
+        </div>
+      ) : result.products.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-14 text-center">
+          <p className="text-lg font-semibold text-gray-900">
+            No products found
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            Try a different search, or browse everything we have.
+          </p>
+          <Link
+            href="/products"
+            className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 transition-colors hover:text-green-700"
+          >
+            All products <Chevron />
+          </Link>
+        </div>
+      ) : (
+        <div className="md:border-x md:border-dashed md:border-gray-200">
+          {result.products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
+
+      {params === "homepage" && result.ok && result.products.length > 0 && (
+        <div className="mt-8 flex justify-center">
+          <Link
+            href={category ? `/products/?category=${category}` : "/products"}
+            className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
+          >
+            View all products <Chevron />
+          </Link>
+        </div>
+      )}
+    </section>
   );
 };
 
 export default ProductList;
-
-// https://first-depot.com/return?OrderTrackingId=f0065216-bc61-416d-8f63-d9d145a6619d&OrderMerchantReference=card_1791292435642_nhar66
