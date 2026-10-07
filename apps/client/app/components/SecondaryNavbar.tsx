@@ -20,58 +20,43 @@ const NAV: NavItem[] = [
     label: "Shop",
     columns: [
       {
-        title: "Building & materials",
+        title: "BuildWare",
         links: [
           {
-            label: "Cement & concrete",
+            label: "BondWare",
             href: "/products?search=cement",
-            desc: "Foundations and walls",
+            desc: "Cement and concrete",
           },
           {
-            label: "Timber & boards",
+            label: "TileWare",
+            href: "/products?search=tiles",
+            desc: "Floors, walls, tiles & splashbacks",
+          },
+          {
+            label: "WoodWare",
             href: "/products?search=timber",
-            desc: "Frames, ceilings, joinery",
+            desc: "Frames, boards, joinery, timber",
           },
           {
-            label: "Roofing",
+            label: "Roofing & ForgeWare",
             href: "/products?search=roofing",
             desc: "Sheets, tiles and fixings",
           },
           {
-            label: "Paints & finishes",
+            label: "CoatWare",
             href: "/products?search=paints",
-            desc: "Interior and exterior",
+            desc: "Paints and finishes",
           },
         ],
       },
       {
-        title: "Interiors",
+        title: "UtilWare",
         links: [
           {
-            label: "Flooring & tiles",
-            href: "/products?search=tiles",
-            desc: "Floors, walls, splashbacks",
-          },
-          {
-            label: "Kitchen & bath",
-            href: "/products?search=kitchen-bath",
-            desc: "Taps, sinks, fittings",
-          },
-          {
-            label: "Lighting",
-            href: "/products?search=lighting",
-            desc: "Indoor and outdoor",
-          },
-          {
-            label: "Furniture",
+            label: "Furniture & Fabric",
             href: "/products?search=furniture",
-            desc: "Comfort for every room",
+            desc: "Indoor & outdoor",
           },
-        ],
-      },
-      {
-        title: "Tools & hardware",
-        links: [
           {
             label: "Power tools",
             href: "/products?search=power-tools",
@@ -83,9 +68,34 @@ const NAV: NavItem[] = [
             desc: "The everyday essentials",
           },
           {
-            label: "Plumbing",
+            label: "Lighting & PowerWare",
+            href: "/products?search=lighting",
+            desc: "Indoor and outdoor",
+          },
+          {
+            label: "Plumbing & FlowWare",
             href: "/products?search=plumbing",
             desc: "Pipes, valves, tanks",
+          },
+        ],
+      },
+      {
+        title: "TechWare",
+        links: [
+          {
+            label: "Home power gadgets",
+            href: "/products?search=power-gadgets",
+            desc: "Drills, saws, grinders",
+          },
+          {
+            label: "Electronics & smart home",
+            href: "/products?search=electrical",
+            desc: "The everyday essentials",
+          },
+          {
+            label: "Home appliances",
+            href: "/products?search=home-appliances",
+            desc: "essentials for your home",
           },
           {
             label: "Electrical",
