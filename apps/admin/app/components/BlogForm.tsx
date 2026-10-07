@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Plus, Trash2 } from "lucide-react";
+import {
+  Bold,
+  Camera,
+  CaseUpper,
+  Italic,
+  Plus,
+  Trash2,
+  Underline,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import type {
   BlogCategoryType,
@@ -22,6 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import {
+  RichBody,
+  applyFormat,
+  blogFontFamily,
+  type FormatName,
+} from "./ui/richText";
 // Adjust this path if your blogs folder lives somewhere else.
 import {
   createBlogPostAction,
@@ -188,6 +202,35 @@ const BlogForm = ({ categories, variants, post }: Props) => {
   const [stat, setStat] = useState(post?.cover.stat ?? "");
   const [coverImage, setCoverImage] = useState(post?.cover.image ?? "");
 
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const format = (name: FormatName) => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const next = applyFormat(el, body, name);
+    setBody(next.value);
+    // Restore the selection after React re-renders the textarea.
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(next.selStart, next.selEnd);
+    });
+  };
+
+  const onBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const key = e.key.toLowerCase();
+    const map: Record<string, FormatName> = {
+      b: "bold",
+      i: "italic",
+      u: "underline",
+    };
+    const name = e.shiftKey && key === "k" ? "caps" : map[key];
+    if (name) {
+      e.preventDefault();
+      format(name);
+    }
+  };
+
   const onTitle = (value: string) => {
     setTitle(value);
     if (!slugTouched) setSlug(slugify(value));
@@ -308,15 +351,52 @@ const BlogForm = ({ categories, variants, post }: Props) => {
 
           <Field
             label="Article body"
-            hint="Leave a blank line between paragraphs."
+            hint="Leave a blank line between paragraphs. Select text, then use the buttons or Ctrl/Cmd + B, I, U (Shift + K for caps)."
           >
+            <div className="flex gap-1">
+              {(
+                [
+                  ["bold", Bold, "Bold (Ctrl+B)"],
+                  ["italic", Italic, "Italic (Ctrl+I)"],
+                  ["underline", Underline, "Underline (Ctrl+U)"],
+                  ["caps", CaseUpper, "CAPS (Ctrl+Shift+K)"],
+                ] as const
+              ).map(([name, Icon, label]) => (
+                <Button
+                  key={name}
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title={label}
+                  aria-label={label}
+                  onMouseDown={(e) => e.preventDefault()} // keep the selection
+                  onClick={() => format(name)}
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              ))}
+            </div>
             <Textarea
-              className="min-h-72 leading-relaxed"
+              ref={bodyRef}
+              className="min-h-72 text-lg leading-relaxed"
+              style={{ fontFamily: blogFontFamily }}
               value={body}
               required
               onChange={(e) => setBody(e.target.value)}
+              onKeyDown={onBodyKeyDown}
             />
           </Field>
+
+          {body.trim() && (
+            <Field
+              label="Preview"
+              hint="How the article will read on the blog."
+            >
+              <div className="rounded-md border bg-background p-5">
+                <RichBody paragraphs={body.split(/\n\s*\n/).filter(Boolean)} />
+              </div>
+            </Field>
+          )}
         </Card>
 
         <Card title="Authors">

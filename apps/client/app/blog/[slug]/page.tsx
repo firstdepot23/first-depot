@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { formatDate, getMorePosts, getPost } from "../../lib/blog";
 import { AuthorList, PostCover } from "../../components/blog/PostCover";
+// Copy rich-text.tsx into the storefront at components/blog/rich-text.tsx
+import { RichBody } from "../../components/blog/richText";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -72,11 +74,9 @@ const BlogPostPage = async ({ params }: Props) => {
         <p className="mt-10 text-xl leading-relaxed text-gray-700">
           {post.excerpt}
         </p>
-        <div className="mt-6 space-y-6 text-lg leading-relaxed text-gray-600">
-          {post.body.map((paragraph, i) => (
-            <p key={i}>{paragraph}</p>
-          ))}
-        </div>
+
+        {/* Renders **bold**, *italic*, __underline__ and ^^CAPS^^ in the serif font */}
+        <RichBody paragraphs={post.body} className="mt-6 text-gray-700" />
       </article>
 
       {/* MORE POSTS */}
