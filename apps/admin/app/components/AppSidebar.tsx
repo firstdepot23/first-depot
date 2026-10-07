@@ -10,6 +10,7 @@ import {
   Shirt,
   User,
   ShoppingBasket,
+  Newspaper,
 } from "lucide-react";
 import {
   Sidebar,
@@ -143,6 +144,34 @@ const AppSidebar = () => {
 
                   <AddCategory />
                 </Sheet>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Blog</SidebarGroupLabel>
+          <SidebarGroupAction asChild>
+            <Link href="/blogs/new">
+              <Plus /> <span className="sr-only">Add Blog Post</span>
+            </Link>
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/blogs">
+                    <Newspaper />
+                    See All Posts
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/blogs/new">
+                    <Plus />
+                    <span>Add Post</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

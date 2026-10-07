@@ -3,8 +3,62 @@ import { columns } from "./columns";
 import { DataTable } from "./data-table";
 import { OrderType } from "@repo/types";
 
+// 502/503/504 from the order service mean "not reachable right now": a cold
+// start on a sleeping Render instance, a restart, or a deploy in progress.
+// Those are worth retrying. A 401/403/404/500 is not, so it fails right away.
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 20_000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchOrders = async (url: string, token: string): Promise<Response> => {
+  let lastFailure = "unknown";
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res: Response | undefined;
+
+    try {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (error) {
+      // "fetch failed" hides the real reason (ECONNREFUSED, ENOTFOUND,
+      // timeout...) in error.cause, so surface it.
+      const err = error as Error & {
+        cause?: { code?: string; message?: string };
+      };
+      lastFailure = err.cause?.code ?? err.cause?.message ?? err.name;
+    }
+
+    if (res) {
+      if (res.ok) return res;
+
+      if (!RETRYABLE_STATUSES.has(res.status)) {
+        throw new Error(`Order service responded with ${res.status}`);
+      }
+
+      lastFailure = `HTTP ${res.status}`;
+      // Release the connection before retrying.
+      await res.body?.cancel().catch(() => undefined);
+    }
+
+    if (attempt < MAX_ATTEMPTS) await sleep(attempt * 2000);
+  }
+
+  throw new Error(
+    `Order service unavailable after ${MAX_ATTEMPTS} attempts (${lastFailure})`,
+  );
+};
+
 const getData = async (): Promise<OrderType[]> => {
-  const baseUrl = process.env.NEXT_PUBLIC_ORDER_SERVICE_URL;
+  // Strip a trailing slash so we never request "//orders".
+  const baseUrl = process.env.NEXT_PUBLIC_ORDER_SERVICE_URL?.replace(
+    /\/+$/,
+    "",
+  );
   if (!baseUrl) {
     throw new Error("NEXT_PUBLIC_ORDER_SERVICE_URL is not set");
   }
@@ -18,18 +72,7 @@ const getData = async (): Promise<OrderType[]> => {
     throw new Error("Could not verify your session");
   }
 
-  const res = await fetch(`${baseUrl}/orders`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-    // Fail fast instead of hanging the page if the order service is asleep.
-    signal: AbortSignal.timeout(8000),
-  });
-
-  // Without this check, a 401/403/500 JSON body such as {"message": "..."}
-  // was passed to the table as if it were a list of orders and crashed it.
-  if (!res.ok) {
-    throw new Error(`Order service responded with ${res.status}`);
-  }
+  const res = await fetchOrders(`${baseUrl}/orders`, token);
 
   const data: unknown = await res.json();
   if (!Array.isArray(data)) {

@@ -1,27 +1,20 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Kafka, type KafkaConfig } from "kafkajs";
 
-// Local dev: no env vars needed, it connects to your local broker.
-//
-// Hosted (Aiven, Confluent, etc.) - set on every service that uses Kafka:
-//   KAFKA_BROKERS=host:port[,host:port]
-//   KAFKA_USERNAME=...
-//   KAFKA_PASSWORD=...
-//   KAFKA_SASL_MECHANISM=plain | scram-sha-256 | scram-sha-512   (default: plain)
-//   KAFKA_SSL=true | false                  (default: true when credentials/certs are set)
-//
-// CA certificate (Aiven needs this because it uses its own project CA).
-// Provide ONE of:
-//   KAFKA_CA_PATH=/etc/secrets/aiven-ca.pem     (Render Secret File - recommended)
-//   KAFKA_CA_CERT="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
-//
-// Optional, only if you use certificate auth instead of SASL:
-//   KAFKA_CLIENT_CERT_PATH / KAFKA_CLIENT_CERT
-//   KAFKA_CLIENT_KEY_PATH  / KAFKA_CLIENT_KEY
-
-const readPem = (value?: string, path?: string) => {
+const readPem = (name: string, value?: string, path?: string) => {
   if (value) return value.replace(/\\n/g, "\n");
-  if (path) return readFileSync(path, "utf8");
+  if (path) {
+    // A path copied from another machine (e.g. Render's /etc/secrets/...)
+    // is the most common cause of a startup crash, so say so clearly.
+    if (!existsSync(path)) {
+      throw new Error(
+        `${name}: file not found at "${path}". If this path came from your ` +
+          `hosting provider, set a path that exists on this machine, or put ` +
+          `the PEM contents in the matching *_CERT variable instead.`,
+      );
+    }
+    return readFileSync(path, "utf8");
+  }
   return undefined;
 };
 
@@ -35,12 +28,18 @@ export const createKafkaClient = (service: string) => {
   const password = process.env.KAFKA_PASSWORD;
   const mechanism = (process.env.KAFKA_SASL_MECHANISM ?? "plain").toLowerCase();
 
-  const ca = readPem(process.env.KAFKA_CA_CERT, process.env.KAFKA_CA_PATH);
+  const ca = readPem(
+    "KAFKA_CA_PATH",
+    process.env.KAFKA_CA_CERT,
+    process.env.KAFKA_CA_PATH,
+  );
   const cert = readPem(
+    "KAFKA_CLIENT_CERT_PATH",
     process.env.KAFKA_CLIENT_CERT,
     process.env.KAFKA_CLIENT_CERT_PATH,
   );
   const key = readPem(
+    "KAFKA_CLIENT_KEY_PATH",
     process.env.KAFKA_CLIENT_KEY,
     process.env.KAFKA_CLIENT_KEY_PATH,
   );

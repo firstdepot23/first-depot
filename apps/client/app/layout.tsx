@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
+import SecondaryNavbar from "./components/SecondaryNavbar";
 import { ToastContainer } from "react-toastify";
 import { ClerkProvider } from "@clerk/nextjs";
 import CartSync from "./components/CartSync";
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               shrink to its content width instead of filling the screen. */}
           <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col px-4 py-4 sm:px-6 lg:px-8">
             <Navbar />
+            <SecondaryNavbar />
             <main className="flex-1">{children}</main>
             <Footer />
           </div>
