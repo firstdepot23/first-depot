@@ -21,6 +21,7 @@ price Int
 sizes String[]
 colors String[]
 images Json
+gallery Json @default("{}")
 createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
 categorySlug String

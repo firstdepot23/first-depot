@@ -30,16 +30,15 @@ const toPlain = (d: LeanPost): BlogPostPlain => ({
     ...(d.cover.image ? { image: d.cover.image } : {}),
   },
   body: [...d.body],
+  productIds: d.productIds ?? [],
   createdAt: d.createdAt?.toISOString(),
   updatedAt: d.updatedAt?.toISOString(),
 });
 
 // Live on the site: published, and the publish date has arrived
 // (a future date works as "scheduled").
-// `as const` keeps status as the literal "published" instead of widening it to
-// `string`; mongoose 9's filter types only accept "draft" | "published" here.
 const livePosts = () => ({
-  status: "published" as const,
+  status: "published",
   publishedAt: { $lte: new Date() },
 });
 
@@ -77,6 +76,19 @@ export const getRelatedPosts = async (
 ): Promise<BlogPostPlain[]> => {
   await connectBlogDB();
   const rows = await BlogPost.find({ ...livePosts(), slug: { $ne: slug } })
+    .sort({ publishedAt: -1 })
+    .limit(limit)
+    .lean<LeanPost[]>();
+  return rows.map(toPlain);
+};
+
+// Posts that were written about one specific product.
+export const getPostsForProduct = async (
+  productId: number,
+  limit = 2,
+): Promise<BlogPostPlain[]> => {
+  await connectBlogDB();
+  const rows = await BlogPost.find({ ...livePosts(), productIds: productId })
     .sort({ publishedAt: -1 })
     .limit(limit)
     .lean<LeanPost[]>();

@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { DataTablePagination } from "../../components/TablePagination";
+import { useConfirm } from "../../components/ConfirmDialog";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
@@ -59,6 +60,7 @@ export function DataTable<TData extends RowData, TValue>({
   const safeData = data ?? [];
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState({});
+  const { confirm, dialog } = useConfirm();
 
   // useTable's `columns` option is typed as ColumnDef<TFeatures, TData,
   // unknown>[]. Because DataTable is generic over a per-column TValue, TS
@@ -135,13 +137,31 @@ export function DataTable<TData extends RowData, TValue>({
     },
   });
 
+  // Ask first. This used to delete the selected users immediately on click.
+  const handleDeleteClick = async () => {
+    const count = table.getSelectedRowModel().rows.length;
+    if (count === 0) return;
+
+    const noun = count === 1 ? "user" : "users";
+    const confirmed = await confirm({
+      title: `Delete ${count} ${noun}?`,
+      message: `You are about to permanently delete ${
+        count === 1 ? `the selected ${noun}` : `${count} selected ${noun}`
+      }. This cannot be undone.`,
+      confirmLabel: "Yes, delete",
+      cancelLabel: "No",
+    });
+    if (confirmed) mutation.mutate();
+  };
+
   return (
     <div className="rounded-md border">
+      {dialog}
       {Object.keys(rowSelection).length > 0 && (
         <div className="flex justify-end">
           <button
             className="flex items-center gap-2 bg-red-500 text-white px-2 py-1 text-sm rounded-md m-4 cursor-pointer"
-            onClick={() => mutation.mutate()}
+            onClick={handleDeleteClick}
             disabled={mutation.isPending}
           >
             <Trash2 className="w-4 h-4" />

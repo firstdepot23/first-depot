@@ -1,6 +1,6 @@
 import { ProductsType } from "@repo/types";
-import { columns } from "./columns";
-import { DataTable } from "./data-table";
+import { requireAdmin } from "../../lib/requireAdmin";
+import ProductsTable from "./productsTable";
 
 const getData = async (): Promise<ProductsType> => {
   const baseUrl = process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL;
@@ -10,7 +10,6 @@ const getData = async (): Promise<ProductsType> => {
 
   const res = await fetch(`${baseUrl}/products`, {
     cache: "no-store",
-
     signal: AbortSignal.timeout(15000),
   });
 
@@ -27,13 +26,18 @@ const getData = async (): Promise<ProductsType> => {
 };
 
 const ProductPage = async () => {
+  await requireAdmin();
   const data = await getData();
+
   return (
     <div className="">
-      <div className="mb-8 px-4 py-2 bg-secondary rounded-md">
+      <div className="mb-8 flex items-center justify-between rounded-md bg-secondary px-4 py-2">
         <h1 className="font-semibold">All Products</h1>
+        <span className="text-xs text-muted-foreground">
+          {data.length} {data.length === 1 ? "product" : "products"}
+        </span>
       </div>
-      <DataTable columns={columns} data={data} />
+      <ProductsTable products={data} />
     </div>
   );
 };

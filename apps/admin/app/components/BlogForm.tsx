@@ -1,17 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Bold,
-  Camera,
-  CaseUpper,
-  Italic,
-  Plus,
-  Trash2,
-  Underline,
-} from "lucide-react";
+import { Camera, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import type {
   BlogCategoryType,
@@ -30,12 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import {
-  RichBody,
-  applyFormat,
-  blogFontFamily,
-  type FormatName,
-} from "./ui/richText";
 // Adjust this path if your blogs folder lives somewhere else.
 import {
   createBlogPostAction,
@@ -201,35 +187,9 @@ const BlogForm = ({ categories, variants, post }: Props) => {
   const [coverText, setCoverText] = useState(post?.cover.text ?? "");
   const [stat, setStat] = useState(post?.cover.stat ?? "");
   const [coverImage, setCoverImage] = useState(post?.cover.image ?? "");
-
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-
-  const format = (name: FormatName) => {
-    const el = bodyRef.current;
-    if (!el) return;
-    const next = applyFormat(el, body, name);
-    setBody(next.value);
-    // Restore the selection after React re-renders the textarea.
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(next.selStart, next.selEnd);
-    });
-  };
-
-  const onBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!(e.ctrlKey || e.metaKey)) return;
-    const key = e.key.toLowerCase();
-    const map: Record<string, FormatName> = {
-      b: "bold",
-      i: "italic",
-      u: "underline",
-    };
-    const name = e.shiftKey && key === "k" ? "caps" : map[key];
-    if (name) {
-      e.preventDefault();
-      format(name);
-    }
-  };
+  const [productIdsText, setProductIdsText] = useState(
+    post?.productIds?.join(", ") ?? "",
+  );
 
   const onTitle = (value: string) => {
     setTitle(value);
@@ -283,6 +243,10 @@ const BlogForm = ({ categories, variants, post }: Props) => {
         ...(variant === "stat" ? { stat } : {}),
         ...(coverImage ? { image: coverImage } : {}),
       },
+      productIds: productIdsText
+        .split(/[\s,]+/)
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n > 0),
       // A blank line starts a new paragraph.
       body: body.split(/\n\s*\n/),
     };
@@ -351,52 +315,15 @@ const BlogForm = ({ categories, variants, post }: Props) => {
 
           <Field
             label="Article body"
-            hint="Leave a blank line between paragraphs. Select text, then use the buttons or Ctrl/Cmd + B, I, U (Shift + K for caps)."
+            hint="Leave a blank line between paragraphs."
           >
-            <div className="flex gap-1">
-              {(
-                [
-                  ["bold", Bold, "Bold (Ctrl+B)"],
-                  ["italic", Italic, "Italic (Ctrl+I)"],
-                  ["underline", Underline, "Underline (Ctrl+U)"],
-                  ["caps", CaseUpper, "CAPS (Ctrl+Shift+K)"],
-                ] as const
-              ).map(([name, Icon, label]) => (
-                <Button
-                  key={name}
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title={label}
-                  aria-label={label}
-                  onMouseDown={(e) => e.preventDefault()} // keep the selection
-                  onClick={() => format(name)}
-                >
-                  <Icon className="h-4 w-4" />
-                </Button>
-              ))}
-            </div>
             <Textarea
-              ref={bodyRef}
-              className="min-h-72 text-lg leading-relaxed"
-              style={{ fontFamily: blogFontFamily }}
+              className="min-h-72 leading-relaxed"
               value={body}
               required
               onChange={(e) => setBody(e.target.value)}
-              onKeyDown={onBodyKeyDown}
             />
           </Field>
-
-          {body.trim() && (
-            <Field
-              label="Preview"
-              hint="How the article will read on the blog."
-            >
-              <div className="rounded-md border bg-background p-5">
-                <RichBody paragraphs={body.split(/\n\s*\n/).filter(Boolean)} />
-              </div>
-            </Field>
-          )}
         </Card>
 
         <Card title="Authors">
@@ -474,6 +401,20 @@ const BlogForm = ({ categories, variants, post }: Props) => {
             Click the circle to add a photo. Without one, the initials are
             shown.
           </p>
+        </Card>
+
+        <Card title="Related products">
+          <Field
+            label="Product IDs (optional)"
+            hint="Separate with commas, e.g. 12, 15. This post then appears on those product pages. Get an ID from Products, row menu, Copy product ID."
+          >
+            <Input
+              value={productIdsText}
+              inputMode="numeric"
+              placeholder="12, 15"
+              onChange={(e) => setProductIdsText(e.target.value)}
+            />
+          </Field>
         </Card>
       </div>
 

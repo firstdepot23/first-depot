@@ -39,6 +39,7 @@ export interface BlogPostSchemaType {
   authors: BlogAuthor[];
   cover: BlogCover;
   body: string[]; // one entry per paragraph
+  productIds: number[]; // products this post is about (shown on their pages)
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -114,6 +115,7 @@ const BlogPostSchema = new Schema<BlogPostSchemaType>(
         message: "The post needs at least one paragraph",
       },
     },
+    productIds: { type: [Number], default: [], index: true },
   },
   { timestamps: true },
 );

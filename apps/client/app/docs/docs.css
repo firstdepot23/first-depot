@@ -1,0 +1,571 @@
+/* First Depot documents reader.
+   Plain CSS, everything scoped under .fd-docs so it cannot leak into the
+   storefront, and written so Tailwind's preflight reset cannot undo it. */
+
+.fd-docs {
+  /* Same palette as the site footer (Footer.tsx):
+       background #c3e1d6 (sign mint), ink #1e4a3c, hover #0b2e23.
+     Every text colour below is at least 4.5:1 on the mint background. */
+  --fd-bg: #c3e1d6;
+  --fd-fg: #1e4a3c;
+  --fd-strong: #0b2e23; /* headings, active Contents entry, hover */
+  --fd-soft: #2f5f4f; /* dates, notes, bracketed descriptions */
+  --fd-muted: #3a6554; /* inactive Contents entries */
+  --fd-rule: rgba(30, 74, 60, 0.22);
+  --fd-chip: rgba(30, 74, 60, 0.1);
+  --fd-dock-bg: rgba(238, 248, 244, 0.86);
+  --fd-dock-border: rgba(30, 74, 60, 0.18);
+  --fd-dock-shadow: 0 8px 28px rgba(11, 46, 35, 0.18);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* never scroll the storefront underneath */
+  background: var(--fd-bg);
+  color: var(--fd-fg);
+  font-family: var(--fd-docs-font), "Iowan Old Style", "Palatino Linotype",
+    Georgia, serif;
+  font-size: 18px;
+  line-height: 32px;
+  font-weight: 400;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Dark theme = the footer palette inverted: forest green with mint ink. */
+.fd-docs[data-theme="dark"] {
+  --fd-bg: #0b2e23;
+  --fd-fg: #c3e1d6;
+  --fd-strong: #e8f5ef;
+  --fd-soft: #a9cdc0;
+  --fd-muted: #7fa898;
+  --fd-rule: rgba(195, 225, 214, 0.22);
+  --fd-chip: rgba(195, 225, 214, 0.09);
+  --fd-dock-bg: rgba(18, 58, 45, 0.88);
+  --fd-dock-border: rgba(195, 225, 214, 0.2);
+  --fd-dock-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-docs {
+    scroll-behavior: auto;
+  }
+}
+
+.fd-docs *,
+.fd-docs *::before,
+.fd-docs *::after {
+  box-sizing: border-box;
+}
+
+/* Resets are limited to the document column on purpose. Unlayered CSS beats
+   Tailwind's layered utilities, so a blanket `.fd-docs p { margin: 0 }` would
+   wipe the spacing and sizes of anything Tailwind-styled inside the reader
+   (such as the NavigationProgress logo card). */
+.fd-docs-col h1,
+.fd-docs-col h2,
+.fd-docs-col h3,
+.fd-docs-col p,
+.fd-docs-col ul,
+.fd-docs-col ol,
+.fd-docs-col li,
+.fd-docs-col pre,
+.fd-docs-col table {
+  margin: 0;
+  padding: 0;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.fd-docs-col a {
+  color: inherit;
+}
+
+.fd-docs ::selection {
+  background: rgba(30, 74, 60, 0.28);
+}
+
+.fd-docs[data-theme="dark"] ::selection {
+  background: rgba(195, 225, 214, 0.3);
+}
+
+.fd-docs :focus-visible {
+  outline: 2px solid var(--fd-fg);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ---------- column + header ---------- */
+
+.fd-docs-col {
+  width: min(580px, calc(100% - 48px));
+  margin: 0 auto;
+  padding-bottom: 112px; /* keeps the last lines clear of the floating bar */
+}
+
+.fd-docs-header {
+  display: flex;
+  align-items: center;
+  height: 76px;
+}
+
+.fd-docs .fd-docs-brand {
+  font-size: 27px;
+  line-height: 1;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- floating bar: social links + theme switch ---------- */
+
+.fd-docs-dock {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 10; /* above the page, below the loader (z-100) */
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--fd-dock-border);
+  border-radius: 999px;
+  background: var(--fd-dock-bg);
+  box-shadow: var(--fd-dock-shadow);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
+.fd-docs-dock a {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--fd-fg);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.fd-docs-dock a:hover {
+  background: var(--fd-chip);
+  color: var(--fd-strong);
+}
+
+.fd-docs-dock-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 10px 0 8px;
+  background: var(--fd-rule);
+}
+
+.fd-docs-switch {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 20px;
+  padding: 0;
+  border: 1.5px solid var(--fd-fg);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fd-docs-switch::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 11px;
+  height: 11px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  background: var(--fd-fg);
+  transition: transform 0.18s ease;
+}
+
+.fd-docs-switch[aria-checked="true"]::after {
+  transform: translateX(19px);
+}
+
+/* ---------- close button + contents ---------- */
+
+.fd-docs .fd-docs-close {
+  position: fixed;
+  top: 22px;
+  left: 17px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  color: var(--fd-fg);
+}
+
+.fd-docs-toc {
+  position: fixed;
+  top: 112px;
+  left: 24px;
+  width: 210px;
+  max-height: calc(100vh - 136px);
+  padding-bottom: 24px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.fd-docs-toc::-webkit-scrollbar {
+  display: none;
+}
+
+.fd-docs .fd-docs-toc-title {
+  margin-bottom: 30px;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.fd-docs-toc a,
+.fd-docs-toc-inline a {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--fd-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.fd-docs-toc a:hover,
+.fd-docs-toc-inline a:hover,
+.fd-docs-toc a.is-active,
+.fd-docs-toc-inline a.is-active {
+  color: var(--fd-strong);
+}
+
+.fd-docs-toc-inline {
+  display: none;
+}
+
+@media (max-width: 1099px) {
+  .fd-docs-toc {
+    display: none;
+  }
+
+  .fd-docs-toc-inline {
+    display: block;
+    margin: 28px 0 8px;
+    padding: 4px 0;
+    border-top: 1px solid var(--fd-rule);
+    border-bottom: 1px solid var(--fd-rule);
+  }
+
+  .fd-docs-toc-inline summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 17px;
+  }
+
+  .fd-docs-toc-inline nav {
+    padding: 8px 0 8px;
+    font-size: 17px;
+    line-height: 28px;
+  }
+}
+
+/* ---------- article ---------- */
+
+.fd-docs .fd-docs-title {
+  margin-top: 44px;
+  font-size: 64px;
+  line-height: 68px;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+
+.fd-docs .fd-docs-subtitle {
+  margin-top: 20px;
+  font-size: 21px;
+  line-height: 30px;
+  font-style: italic;
+  text-wrap: balance;
+}
+
+.fd-docs .fd-docs-date {
+  margin: 40px 0 16px;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--fd-soft);
+}
+
+.fd-docs-article p,
+.fd-docs-article ul,
+.fd-docs-article ol,
+.fd-docs-article .fd-docs-table,
+.fd-docs-article pre {
+  margin-bottom: 20px;
+}
+
+.fd-docs .fd-docs-article h2 {
+  margin: 56px 0 18px;
+  font-size: 30px;
+  line-height: 38px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  scroll-margin-top: 28px;
+  text-wrap: balance;
+}
+
+.fd-docs .fd-docs-article h3 {
+  margin: 32px 0 6px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.fd-docs-article ul,
+.fd-docs-article ol {
+  padding-left: 24px;
+}
+
+.fd-docs-article ul {
+  list-style: disc;
+}
+
+.fd-docs-article ol {
+  list-style: decimal;
+}
+
+.fd-docs-article li {
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.fd-docs-article li::marker {
+  color: var(--fd-soft);
+}
+
+.fd-docs-article a,
+.fd-docs-intro a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.fd-docs-article code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--fd-chip);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82em;
+}
+
+.fd-docs-article pre {
+  overflow-x: auto;
+  padding: 16px 18px;
+  border-radius: 8px;
+  background: var(--fd-chip);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.fd-docs-article pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  white-space: pre;
+}
+
+.fd-docs .fd-docs-article .fd-docs-note {
+  padding-left: 16px;
+  border-left: 2px solid var(--fd-muted);
+  color: var(--fd-soft);
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.fd-docs-table {
+  overflow-x: auto;
+}
+
+.fd-docs-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.fd-docs-table th,
+.fd-docs-table td {
+  padding: 10px 16px 10px 0;
+  border-bottom: 1px solid var(--fd-rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.fd-docs-table th {
+  font-weight: 700;
+  border-bottom-color: var(--fd-fg);
+  white-space: nowrap;
+}
+
+/* ---------- index page ---------- */
+
+.fd-docs-intro {
+  margin-top: 14px;
+}
+
+.fd-docs-intro p {
+  margin-bottom: 20px;
+}
+
+.fd-docs .fd-docs-group {
+  margin: 36px 0 12px;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 700;
+}
+
+.fd-docs .fd-docs-index {
+  padding-left: 24px;
+  list-style: disc;
+}
+
+.fd-docs-index li {
+  margin-bottom: 14px;
+  padding-left: 4px;
+}
+
+.fd-docs-index a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.fd-docs-index span {
+  color: var(--fd-soft);
+}
+
+/* ---------- previous / next + footer ---------- */
+
+.fd-docs-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--fd-rule);
+}
+
+.fd-docs .fd-docs-pager a {
+  display: block;
+  max-width: 48%;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.fd-docs .fd-docs-pager a.is-next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.fd-docs-pager a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.fd-docs-pager small {
+  display: block;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--fd-muted);
+}
+
+.fd-docs .fd-docs-foot {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--fd-rule);
+  color: var(--fd-muted);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.fd-docs .fd-docs-end {
+  height: 40px;
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 640px) {
+  .fd-docs {
+    font-size: 17px;
+    line-height: 29px;
+  }
+
+  .fd-docs-col {
+    width: calc(100% - 40px);
+  }
+
+  .fd-docs-header {
+    padding-left: 34px;
+  }
+
+  .fd-docs .fd-docs-close {
+    left: 10px;
+    top: 20px;
+  }
+
+  .fd-docs .fd-docs-title {
+    margin-top: 28px;
+    font-size: 40px;
+    line-height: 46px;
+  }
+
+  .fd-docs .fd-docs-subtitle {
+    font-size: 19px;
+    line-height: 28px;
+  }
+
+  .fd-docs .fd-docs-article h2 {
+    margin-top: 44px;
+    font-size: 25px;
+    line-height: 32px;
+  }
+
+  .fd-docs-table th {
+    white-space: normal;
+  }
+}
+
+/* ---------- emphasis colour ---------- */
+
+.fd-docs .fd-docs-brand,
+.fd-docs .fd-docs-title,
+.fd-docs .fd-docs-toc-title,
+.fd-docs .fd-docs-group,
+.fd-docs .fd-docs-article h2,
+.fd-docs .fd-docs-article h3,
+.fd-docs-article strong {
+  color: var(--fd-strong);
+}
+
+@media (max-width: 640px) {
+  .fd-docs-col {
+    padding-bottom: 120px;
+  }
+
+  .fd-docs-dock {
+    padding: 5px 10px 5px 6px;
+  }
+
+  .fd-docs-dock a {
+    width: 34px;
+    height: 34px;
+  }
+}

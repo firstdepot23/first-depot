@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import type { ProductType } from "@repo/types";
 import {
   SheetContent,
   SheetDescription,
@@ -13,35 +14,46 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import ProductForm from "./ProductForm";
 import {
+  categorySlugOf,
   cleanProductValues,
-  createProduct,
+  updateProduct,
   type ProductFormValues,
 } from "../lib/productApi";
 
-const defaultValues: ProductFormValues = {
-  name: "",
-  shortDescription: "",
-  description: "",
-  price: 0,
-  categorySlug: "",
-  sizes: [],
-  colors: [],
-  images: {},
-  gallery: {},
-};
-
-// Uses the same form as EditProduct, so cover + extra photos work the same
-// way when adding and editing.
-const AddProduct = () => {
+const EditProduct = ({
+  product,
+  onSaved,
+}: {
+  product: ProductType;
+  onSaved: () => void;
+}) => {
   const { getToken } = useAuth();
   const router = useRouter();
 
+  const defaultValues: ProductFormValues = {
+    name: product.name,
+    shortDescription: product.shortDescription,
+    description: product.description,
+    price: product.price,
+    categorySlug: categorySlugOf(product),
+    sizes: [...product.sizes],
+    colors: [...product.colors],
+    images: { ...((product.images ?? {}) as Record<string, string>) },
+    // Older products have no extra photos yet.
+    gallery: { ...((product.gallery ?? {}) as Record<string, string[]>) },
+  };
+
   const mutation = useMutation({
     mutationFn: async (values: ProductFormValues) => {
-      await createProduct(cleanProductValues(values), await getToken());
+      await updateProduct(
+        product.id,
+        cleanProductValues(values),
+        await getToken(),
+      );
     },
     onSuccess: () => {
-      toast.success("Product created successfully");
+      toast.success("Product updated");
+      onSaved();
       router.refresh();
     },
     onError: (error) => {
@@ -53,9 +65,9 @@ const AddProduct = () => {
     <SheetContent>
       <ScrollArea className="h-screen">
         <SheetHeader>
-          <SheetTitle>Add Product</SheetTitle>
+          <SheetTitle>Edit Product</SheetTitle>
           <SheetDescription>
-            Fill in the details below, then submit.
+            Change the details below, then save.
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-10">
@@ -63,7 +75,7 @@ const AddProduct = () => {
             defaultValues={defaultValues}
             onSubmit={(values) => mutation.mutate(values)}
             isPending={mutation.isPending}
-            submitLabel="Submit"
+            submitLabel="Save changes"
           />
         </div>
       </ScrollArea>
@@ -71,4 +83,4 @@ const AddProduct = () => {
   );
 };
 
-export default AddProduct;
+export default EditProduct;

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ProductType } from "@repo/types";
 import { categories } from "../data/categoryData";
+import { buildSearchPlan } from "../data/searchTerms";
 import { startLoader } from "./NavigationProgress";
 
 /**
@@ -109,10 +110,13 @@ const SearchBar = () => {
 
     const timeout = setTimeout(async () => {
       try {
+        // "paints" -> "paint"; "cement"/"bondware" -> the BondWare category.
+        const plan = buildSearchPlan(query, category === "all");
         const params = new URLSearchParams();
-        params.set("search", query);
+        if (plan.search) params.set("search", plan.search);
         params.set("limit", "6");
-        if (category !== "all") params.set("category", category);
+        if (plan.category) params.set("category", plan.category);
+        else if (category !== "all") params.set("category", category);
 
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL}/products?${params.toString()}`,
@@ -142,16 +146,26 @@ const SearchBar = () => {
     };
   }, [value, category, open]);
 
-  const runSearch = (query: string) => {
+  // `exact` is for clicking a suggested product name: search it as typed
+  // instead of treating it as a category word.
+  const runSearch = (query: string, exact = false) => {
     const trimmed = query.trim();
     if (!trimmed) return;
 
+    const plan = buildSearchPlan(trimmed, category === "all" && !exact);
+
     const params = new URLSearchParams(searchParams);
-    params.set("search", trimmed);
-    if (category !== "all") {
-      params.set("category", category);
+    if (plan.category) {
+      // The query named a category (e.g. "bondware", "cement", "paints").
+      params.delete("search");
+      params.set("category", plan.category);
     } else {
-      params.delete("category");
+      params.set("search", exact ? trimmed : plan.search);
+      if (category !== "all") {
+        params.set("category", category);
+      } else {
+        params.delete("category");
+      }
     }
 
     startLoader();
@@ -160,6 +174,7 @@ const SearchBar = () => {
   };
 
   const trimmedValue = value.trim();
+  const plan = buildSearchPlan(trimmedValue, category === "all");
 
   return (
     <Suspense fallback={null}>
@@ -308,13 +323,26 @@ const SearchBar = () => {
                       </span>
                     </button>
 
+                    {plan.category && (
+                      <button
+                        type="button"
+                        onClick={() => runSearch(value)}
+                        className="flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3.5 text-left text-sm transition-colors hover:bg-gray-100 active:bg-gray-200"
+                      >
+                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                        <span className="truncate">
+                          Browse all in <strong>{plan.categoryName}</strong>
+                        </span>
+                      </button>
+                    )}
+
                     {suggestions.length > 0 && (
                       <ul className="border-t border-gray-100">
                         {suggestions.map((product) => (
                           <li key={product.id}>
                             <button
                               type="button"
-                              onClick={() => runSearch(product.name)}
+                              onClick={() => runSearch(product.name, true)}
                               className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm transition-colors hover:bg-gray-100 active:bg-gray-200"
                             >
                               <Search className="h-4 w-4 shrink-0 text-gray-400" />

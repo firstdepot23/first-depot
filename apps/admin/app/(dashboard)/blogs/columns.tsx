@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
+import { useConfirm } from "../../components/ConfirmDialog";
 import type { DataTableFeatures } from "../products/data-table";
 import { deleteBlogPostAction } from "./actions";
 
@@ -24,10 +25,23 @@ const clientUrl = process.env.NEXT_PUBLIC_CLIENT_URL;
 const RowActions = ({ post }: { post: BlogPostType }) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
 
-  const onDelete = () => {
-    if (!window.confirm(`Delete "${post.title}"? This cannot be undone.`))
-      return;
+  const onDelete = async () => {
+    const confirmed = await confirm({
+      title: "Delete this post?",
+      message: (
+        <>
+          You are about to permanently delete{" "}
+          <span className="font-medium text-foreground">{post.title}</span>.
+          This cannot be undone.
+        </>
+      ),
+      confirmLabel: "Yes, delete",
+      cancelLabel: "No",
+    });
+    if (!confirmed) return;
+
     startTransition(async () => {
       const res = await deleteBlogPostAction(post._id);
       if (!res.ok) {
@@ -40,35 +54,38 @@ const RowActions = ({ post }: { post: BlogPostType }) => {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0" disabled={pending}>
-          <span className="sr-only">Open menu</span>
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem asChild>
-          <Link href={`/blogs/${post._id}/edit`}>Edit post</Link>
-        </DropdownMenuItem>
-        {clientUrl && post.status === "published" && (
+    <>
+      {dialog}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0" disabled={pending}>
+            <span className="sr-only">Open menu</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuItem asChild>
-            <a
-              href={`${clientUrl}/blog/${post.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View on site
-            </a>
+            <Link href={`/blogs/${post._id}/edit`}>Edit post</Link>
           </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={onDelete}>
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {clientUrl && post.status === "published" && (
+            <DropdownMenuItem asChild>
+              <a
+                href={`${clientUrl}/blog/${post.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View on site
+              </a>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 };
 
