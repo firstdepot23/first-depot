@@ -17,7 +17,9 @@ const PendingPaymentSchema = new Schema(
         price: { type: Number, required: true },
       },
     ],
-    processed: { type: Boolean, default: false },
+    processed: { type: Boolean, default: false }, // true once a successful order was published
+    failureRecorded: { type: Boolean, default: false }, // true once a failed order was published
+    trackingId: { type: String }, // Pesapal order tracking id
   },
   { timestamps: true },
 );
