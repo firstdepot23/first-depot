@@ -37,9 +37,9 @@ export const company = {
   },
   phone: "+256 781905753",
   phoneHref: "+256781905753",
-  whatsapp: "+256 781 905 753",
-  whatsappHref: "https://wa.me/256781905753",
-  address: "Plot 00, Ojwina Road, Lira city West, Lira, Uganda",
+  whatsapp: "+256 777433635",
+  whatsappHref: "https://wa.me/256777433635",
+  address: "Plot 00, Ojwina Road, Lira City West, Lira City, Uganda",
   hours: {
     weekdays: "Monday to Saturday, 8:00 am to 6:00 pm",
     sunday: "Sunday, 9:00 am to 5:00 pm",

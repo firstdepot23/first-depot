@@ -169,7 +169,7 @@ const NAV: NavItem[] = [
   { label: "Blog", href: "/blog" },
 ];
 
-const CTA = { label: "Get a quote", href: "/support" };
+const CTA = { label: "Get a quote", href: "/docs/contacts" };
 
 const Chevron = ({ className = "" }: { className?: string }) => (
   <svg
