@@ -38,7 +38,7 @@ const toPlain = (d: LeanPost): BlogPostPlain => ({
 // Live on the site: published, and the publish date has arrived
 // (a future date works as "scheduled").
 const livePosts = () => ({
-  status: "published",
+  status: "published" as const,
   publishedAt: { $lte: new Date() },
 });
 
