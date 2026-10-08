@@ -24,27 +24,27 @@ const NAV: NavItem[] = [
         links: [
           {
             label: "BondWare",
-            href: "/products?search=cement",
+            href: "/products?category=cem",
             desc: "Cement and concrete",
           },
           {
             label: "TileWare",
-            href: "/products?search=tiles",
+            href: "/products?category=tiles",
             desc: "Floors, walls, tiles & splashbacks",
           },
           {
             label: "WoodWare",
-            href: "/products?search=timber",
+            href: "/products?category=wood",
             desc: "Frames, boards, joinery, timber",
           },
           {
             label: "Roofing & ForgeWare",
-            href: "/products?search=roofing",
+            href: "/products?category=metal",
             desc: "Sheets, tiles and fixings",
           },
           {
             label: "CoatWare",
-            href: "/products?search=paints",
+            href: "/products?category=paint",
             desc: "Paints and finishes",
           },
         ],
@@ -54,27 +54,27 @@ const NAV: NavItem[] = [
         links: [
           {
             label: "Furniture & Fabric",
-            href: "/products?search=furniture",
+            href: "/products?category=furniture",
             desc: "Indoor & outdoor",
           },
           {
             label: "Power tools",
-            href: "/products?search=power-tools",
+            href: "/products?category=tools",
             desc: "Drills, saws, grinders",
           },
           {
             label: "Hand tools",
-            href: "/products?search=hand-tools",
+            href: "/products?category=tools",
             desc: "The everyday essentials",
           },
           {
             label: "Lighting & PowerWare",
-            href: "/products?search=lighting",
+            href: "/products?category=electricals",
             desc: "Indoor and outdoor",
           },
           {
             label: "Plumbing & FlowWare",
-            href: "/products?search=plumbing",
+            href: "/products?category=plumbing",
             desc: "Pipes, valves, tanks",
           },
         ],
@@ -84,22 +84,22 @@ const NAV: NavItem[] = [
         links: [
           {
             label: "Home power gadgets",
-            href: "/products?search=power-gadgets",
+            href: "/products?search=power%20gadget",
             desc: "Drills, saws, grinders",
           },
           {
             label: "Electronics & smart home",
-            href: "/products?search=electrical",
+            href: "/products?category=electricals",
             desc: "The everyday essentials",
           },
           {
             label: "Home appliances",
-            href: "/products?search=home-appliances",
+            href: "/products?search=home%20appliance",
             desc: "essentials for your home",
           },
           {
             label: "Electrical",
-            href: "/products?search=electrical",
+            href: "/products?category=electricals",
             desc: "Cables, switches, boards",
           },
         ],
@@ -152,10 +152,14 @@ const NAV: NavItem[] = [
       {
         title: "Help",
         links: [
-          { label: "Support", href: "/support", desc: "Talk to our team" },
+          {
+            label: "Support",
+            href: "/docs/contacts",
+            desc: "Talk to our team",
+          },
           {
             label: "Important documents",
-            href: "/documents",
+            href: "/docs",
             desc: "Terms, privacy and refunds",
           },
         ],

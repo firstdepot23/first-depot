@@ -10,7 +10,8 @@ import { shouldBeAdmin } from "../middleware/authMiddleware";
 
 const router: Router = Router();
 
-router.post("/", createProduct);
+// Creating a product used to be open to anyone; it is admin-only now.
+router.post("/", shouldBeAdmin, createProduct);
 router.put("/:id", shouldBeAdmin, updateProduct);
 router.delete("/:id", shouldBeAdmin, deleteProduct);
 router.get("/", getProducts);

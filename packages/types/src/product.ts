@@ -244,6 +244,11 @@ export const units = [
 
 export type UnitType = (typeof units)[number];
 
+// Photos per color: one cover photo (shown on the products page) plus up to
+// MAX_GALLERY_IMAGES extra photos (shown on the product's own page).
+export const MAX_GALLERY_IMAGES = 8;
+export const MAX_PHOTOS_PER_COLOR = 1 + MAX_GALLERY_IMAGES;
+
 export const ProductFormSchema = z
   .object({
     name: z
@@ -271,6 +276,14 @@ export const ProductFormSchema = z
     images: z.record(z.string(), z.string(), {
       message: "Image for each color is required!",
     }),
+    // Extra photos per color. Optional, so older products and callers that
+    // only know about `images` keep working.
+    gallery: z
+      .record(
+        z.string(),
+        z.array(z.string().min(1)).max(MAX_GALLERY_IMAGES),
+      )
+      .optional(),
   })
   .refine(
     (data) => {
@@ -295,3 +308,23 @@ export const CategoryFormSchema = z.object({
     .string({ message: "Slug is Required!" })
     .min(1, { message: "Slug is Required!" }),
 });
+
+// All photos for one color, cover first. The cover is the one to show on the
+// products page; the rest belong on the product's own page.
+export const photosForColor = (
+  product: { images: unknown; gallery?: unknown },
+  color: string,
+): string[] => {
+  const images = product.images as Record<string, unknown> | null | undefined;
+  const gallery = product.gallery as Record<string, unknown> | null | undefined;
+
+  const cover = images?.[color];
+  const extras = gallery?.[color];
+
+  return [
+    ...(typeof cover === "string" && cover ? [cover] : []),
+    ...(Array.isArray(extras)
+      ? extras.filter((u): u is string => typeof u === "string" && !!u)
+      : []),
+  ];
+};

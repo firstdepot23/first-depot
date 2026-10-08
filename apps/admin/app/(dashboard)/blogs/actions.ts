@@ -52,6 +52,13 @@ const clean = (raw: BlogPostInput): BlogPostInput => {
     .filter((a) => a.name);
   const coverText = raw.cover?.text?.trim() ?? "";
   const stat = raw.cover?.stat?.trim() ?? "";
+  const productIds = Array.from(
+    new Set(
+      (raw.productIds ?? [])
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n > 0),
+    ),
+  ).slice(0, 20);
 
   if (!title) throw new UserError("Title is required.");
   if (title.length > 140) throw new UserError("Title is too long (max 140).");
@@ -84,6 +91,7 @@ const clean = (raw: BlogPostInput): BlogPostInput => {
       ...(cloudinaryUrl(raw.cover.image) ? { image: cloudinaryUrl(raw.cover.image) } : {}),
     },
     body,
+    productIds,
   };
 };
 

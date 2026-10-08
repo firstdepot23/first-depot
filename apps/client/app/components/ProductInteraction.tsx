@@ -1,28 +1,26 @@
 "use client";
 
 import { ProductType } from "@repo/types";
-import { Minus, Plus, ShoppingCart } from "lucide-react";
+import { Check, ShoppingCart } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import useCartStore, { useCartItemQuantity } from "../stores/storeCart";
 import ColorSelect from "./ColorSelect";
+import { startLoader } from "./NavigationProgress";
+import { useProductSelection } from "./ProductSelection";
 import QuantityStepper from "./QuantityStepper";
 
-const ProductInteraction = ({
-  product,
-  selectedSize,
-  selectedColor,
-}: {
-  product: ProductType;
-  selectedSize: string;
-  selectedColor: string;
-}) => {
+const ProductInteraction = ({ product }: { product: ProductType }) => {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const {
+    size: selectedSize,
+    color: selectedColor,
+    setSize,
+    setColor,
+  } = useProductSelection();
   const [quantity, setQuantity] = useState(1);
 
   const { isSignedIn } = useAuth();
@@ -35,6 +33,7 @@ const ProductInteraction = ({
     selectedSize,
     selectedColor,
   );
+  const inCart = !!isSignedIn && cartQuantity > 0;
 
   const cartVariant = {
     id: product.id,
@@ -42,134 +41,144 @@ const ProductInteraction = ({
     selectedColor,
   };
 
-  const handleTypeChange = (type: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(type, value);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  };
-
-  const handleQuantityChange = (type: "increment" | "decrement") => {
-    if (type === "increment") {
-      setQuantity((prev) => prev + 1);
-    } else {
-      if (quantity > 1) {
-        setQuantity((prev) => prev - 1);
-      }
-    }
-  };
-
-  const handleAddToCart = () => {
-    // The cart lives in the account's database record now, so there's
-    // nowhere to put an item for someone who isn't signed in yet -
-    // prompt sign-in instead of silently dropping it.
-    if (!isSignedIn) {
-      openSignIn();
-      return;
-    }
-
+  const addCurrentSelection = () =>
     addToCart({
       ...product,
       quantity,
       selectedColor,
       selectedSize,
     });
+
+  const handleAddToCart = () => {
+    // The cart lives in the account's database record, so there's nowhere to
+    // put an item for someone who isn't signed in yet: prompt sign-in.
+    if (!isSignedIn) {
+      openSignIn();
+      return;
+    }
+    addCurrentSelection();
     setQuantity(1);
     toast.success("Product added to cart");
   };
+
+  // "Buy this item": make sure it is in the cart, then go straight to it.
+  const handleBuyNow = () => {
+    if (!isSignedIn) {
+      openSignIn();
+      return;
+    }
+    if (cartQuantity === 0) addCurrentSelection();
+    startLoader();
+    router.push("/cart");
+  };
+
   return (
-    <div className="flex flex-col gap-4 mt-4">
+    <div className="flex flex-col gap-7">
       {/* SIZE */}
-      <div className="flex flex-col gap-2 text-xs">
-        <span className="text-gray-500">Size</span>
-        <div className="flex items-center gap-2">
-          {product.sizes.map((size) => (
-            <div
-              className={`cursor-pointer border-1 p-[2px] ${
-                selectedSize === size ? "border-gray-600" : "border-gray-300"
-              }`}
-              key={size}
-              onClick={() => handleTypeChange("size", size)}
-            >
-              <div
-                className={`w-6 h-6 text-center flex items-center justify-center ${
-                  selectedSize === size
-                    ? "bg-black text-white"
-                    : "bg-white text-black"
+      <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-medium text-gray-900">Size</span>
+          <span className="truncate text-sm text-gray-500">
+            {selectedSize.toUpperCase()}
+          </span>
+        </div>
+        <div
+          role="radiogroup"
+          aria-label="Size"
+          className="mt-3 flex flex-wrap gap-2"
+        >
+          {product.sizes.map((size) => {
+            const selected = size === selectedSize;
+            return (
+              <button
+                key={size}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setSize(size)}
+                className={`h-11 min-w-12 max-w-full cursor-pointer truncate rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 ${
+                  selected
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-900"
                 }`}
               >
                 {size.toUpperCase()}
-              </div>
-            </div>
-          ))}
+              </button>
+            );
+          })}
         </div>
-      </div>
-      {/* COLOR */}
-      <div className="flex flex-col gap-2 text-sm">
-        <span className="text-gray-500">Color</span>
-        <ColorSelect
-          colors={product.colors}
-          value={selectedColor}
-          onChange={(value) => handleTypeChange("color", value)}
-        />
       </div>
 
-      {isSignedIn && cartQuantity > 0 ? (
-        /* ALREADY IN CART - edit the cart quantity directly */
-        <div className="flex flex-col gap-2 text-sm">
-          <span className="text-gray-500">Quantity</span>
-          <div className="flex items-center gap-4">
-            <QuantityStepper
-              quantity={cartQuantity}
-              // Minus at 1 removes the item, returning to "Add to Cart".
-              onDecrease={() => updateQuantity(cartVariant, cartQuantity - 1)}
-              onIncrease={() => updateQuantity(cartVariant, cartQuantity + 1)}
-            />
-            <span className="text-xs text-gray-500">
-              ({cartQuantity} item(s) added)
-            </span>
-            <Link
-              href="/cart"
-              className="text-xs underline text-gray-800 hover:text-black"
-            >
-              View cart
-            </Link>
-          </div>
+      {/* COLOR */}
+      <div>
+        <span className="text-sm font-medium text-gray-900">Color</span>
+        <div className="mt-3">
+          <ColorSelect
+            colors={product.colors}
+            value={selectedColor}
+            onChange={setColor}
+          />
         </div>
-      ) : (
-        <>
-          {/* QUANTITY */}
-          <div className="flex flex-col gap-2 text-sm">
-            <span className="text-gray-500">Quantity</span>
-            <div className="flex items-center gap-2">
-              <button
-                className="cursor-pointer border-1 border-gray-300 p-1"
-                onClick={() => handleQuantityChange("decrement")}
+      </div>
+
+      {/* QUANTITY */}
+      <div>
+        <span className="text-sm font-medium text-gray-900">Quantity</span>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+          {inCart ? (
+            <>
+              <QuantityStepper
+                quantity={cartQuantity}
+                // Minus at 1 removes the item, returning to "Add to Cart".
+                onDecrease={() => updateQuantity(cartVariant, cartQuantity - 1)}
+                onIncrease={() => updateQuantity(cartVariant, cartQuantity + 1)}
+              />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-800 ring-1 ring-green-900/10">
+                <Check className="h-3.5 w-3.5" />
+                {cartQuantity} in your cart
+              </span>
+              <Link
+                href="/cart"
+                className="text-sm font-semibold text-green-600 transition-colors hover:text-green-700"
               >
-                <Minus className="w-4 h-4" />
-              </button>
-              <span>{quantity}</span>
-              <button
-                className="cursor-pointer border-1 border-gray-300 p-1"
-                onClick={() => handleQuantityChange("increment")}
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          {/* BUTTONS */}
+                View cart
+              </Link>
+            </>
+          ) : (
+            <QuantityStepper
+              quantity={quantity}
+              disableDecrease={quantity <= 1}
+              onDecrease={() => setQuantity((q) => Math.max(1, q - 1))}
+              onIncrease={() => setQuantity((q) => q + 1)}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {!inCart && (
           <button
+            type="button"
             onClick={handleAddToCart}
-            className="bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg flex items-center justify-center gap-2 cursor-pointer text-sm font-medium"
+            className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-gray-900 px-6 text-sm font-medium text-white transition-colors hover:bg-green-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
           >
-            <Plus className="w-4 h-4" />
+            <ShoppingCart className="h-4 w-4" />
             Add to Cart
           </button>
-        </>
-      )}
-      <button className="ring-1 ring-gray-400 shadow-lg text-gray-800 px-4 py-2 rounded-md flex items-center justify-center cursor-pointer gap-2 text-sm font-medium">
-        <ShoppingCart className="w-4 h-4" />
-        Buy this Item
-      </button>
+        )}
+        <button
+          type="button"
+          onClick={handleBuyNow}
+          className={`flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-6 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 ${
+            inCart
+              ? "bg-gray-900 text-white hover:bg-green-700"
+              : "border border-gray-300 bg-white text-gray-900 hover:border-gray-900"
+          }`}
+        >
+          {inCart ? "Go to checkout" : "Buy this Item"}
+        </button>
+      </div>
     </div>
   );
 };

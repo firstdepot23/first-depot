@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 const documentLinks = [
-  { label: "Terms of Service", href: "/" },
-  { label: "Privacy Policy", href: "/" },
-  { label: "Return & Refund Policy", href: "/" },
+  { label: "Terms of Service", href: "/docs/terms-of-service" },
+  { label: "Privacy Policy", href: "/docs/privacy-policy" },
+  { label: "Return & Refund Policy", href: "/docs/return-and-refund-policy" },
 ];
 
 // Seafoam palette taken from the Giggling Squid signage:

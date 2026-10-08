@@ -20,6 +20,7 @@ export {
   deletePost,
   getAllPosts,
   getPostById,
+  getPostsForProduct,
   getPublishedPostBySlug,
   getPublishedPosts,
   getRelatedPosts,
