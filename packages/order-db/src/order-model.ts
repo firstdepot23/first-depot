@@ -9,6 +9,8 @@ const OrderSchema = new Schema(
     email: { type: String, required: true },
     amount: { type: Number, required: true },
     status: { type: String, required: true, enum: OrderStatus },
+    trackingId: { type: String }, // Pesapal order tracking id
+    paymentMethod: { type: String },
     products: {
       type: [
         {
@@ -22,6 +24,10 @@ const OrderSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// One order per Pesapal payment. Sparse so older orders without a
+// trackingId don't clash with each other.
+OrderSchema.index({ trackingId: 1 }, { unique: true, sparse: true });
 
 export type OrderSchemaType = InferSchemaType<typeof OrderSchema>;
 
