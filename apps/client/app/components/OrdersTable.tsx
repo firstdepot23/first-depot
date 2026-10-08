@@ -10,12 +10,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-// `paymentMethod` isn't on the shared OrderType yet - see the note in the
-// chat reply about adding it to the Order schema in @repo/order-db. This
-// local extension lets the table render it as soon as the field exists on
-// the data, without needing that shared package updated first.
-type Order = OrderType & { paymentMethod?: string };
-
 type SortKey = "date" | "amount";
 type SortDirection = "asc" | "desc";
 
@@ -50,7 +44,7 @@ const PAYMENT_METHOD_ICONS: Record<string, typeof Wallet> = {
   bank_card: CreditCard,
 };
 
-const PaymentMethodBadge = ({ method }: { method?: string }) => {
+const PaymentMethodBadge = ({ method }: { method?: string | null }) => {
   if (!method) return <span className="text-gray-400">-</span>;
 
   const Icon = PAYMENT_METHOD_ICONS[method] ?? Wallet;
@@ -76,7 +70,7 @@ const formatDate = (date: string | Date | undefined) =>
       })
     : "-";
 
-const OrdersTable = ({ orders }: { orders: Order[] }) => {
+const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [methodFilter, setMethodFilter] = useState<string>("all");
