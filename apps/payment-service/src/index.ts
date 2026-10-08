@@ -1,6 +1,5 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { clerkMiddleware } from "@hono/clerk-auth";
 import { cors } from "hono/cors";
 import { connectOrderDB } from "@repo/order-db";
 import { producer } from "./utils/kafka.js";
@@ -16,10 +15,10 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3004")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-// CORS first, so browser preflight (OPTIONS) requests are answered
-// before Clerk's middleware runs.
+// CORS first, so browser preflight (OPTIONS) requests are answered.
+// Sign-in is checked per route by shouldBeUser (middleware/authMiddleware.ts),
+// not globally, so /health and the Pesapal webhook never depend on Clerk.
 app.use("*", cors({ origin: allowedOrigins }));
-app.use("*", clerkMiddleware());
 
 app.get("/health", (c) => {
   return c.json({
