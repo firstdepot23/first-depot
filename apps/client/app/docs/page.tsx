@@ -16,7 +16,7 @@ export default function DocsIndexPage() {
           what we stock.
         </p>
         <p>
-          {company.tagline}. If you cannot find what you are looking for,{" "}
+          {company.tagline}. If you can not find what you are looking for,{" "}
           <Link href="/docs/contacts">get in touch</Link>.
         </p>
       </div>

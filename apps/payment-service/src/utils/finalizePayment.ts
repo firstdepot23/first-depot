@@ -10,16 +10,7 @@ export type FinalizeResult = {
   reference: string; // Pesapal order tracking id
 };
 
-/**
- * The single place where a Pesapal payment becomes an order.
- *
- * Called from BOTH the Pesapal IPN (webhooks.route.ts) and the status
- * endpoints the frontend polls, so an order is created even if the IPN never
- * reaches us (wrong registered URL, service asleep on Render, etc.).
- *
- * Safe to call any number of times: the pending payment is claimed
- * atomically, so only the first successful call publishes payment.successful.
- */
+
 export const finalizePayment = async (
   orderTrackingId: string,
   known?: PesapalTransactionStatus,
