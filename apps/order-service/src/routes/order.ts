@@ -5,6 +5,8 @@ import { startOfMonth, subMonths } from "date-fns";
 import { OrderChartType } from "@repo/types";
 
 export const orderRoute = async (fastify: FastifyInstance) => {
+  // The customer sees ALL their orders, including PENDING ones, so a payment
+  // that is still being confirmed by Pesapal shows up straight away.
   fastify.get(
     "/user-orders",
     { preHandler: shouldBeUser },
@@ -23,12 +25,16 @@ export const orderRoute = async (fastify: FastifyInstance) => {
       }
     }
   );
+
+  // Admin views skip PENDING orders (checkouts nobody has paid for yet).
   fastify.get(
     "/orders",
     { preHandler: shouldBeAdmin },
     async (request, reply) => {
       const { limit } = request.query as { limit: number };
-      const orders = await Order.find().limit(limit).sort({ createdAt: -1 });
+      const orders = await Order.find({ paymentStatus: { $ne: "PENDING" } })
+        .limit(limit)
+        .sort({ createdAt: -1 });
       return reply.send(orders);
     }
   );
@@ -45,6 +51,7 @@ export const orderRoute = async (fastify: FastifyInstance) => {
         {
           $match: {
             createdAt: { $gte: sixMonthsAgo, $lte: now },
+            paymentStatus: { $ne: "PENDING" },
           },
         },
         {
@@ -55,14 +62,10 @@ export const orderRoute = async (fastify: FastifyInstance) => {
             },
             total: { $sum: 1 },
             successful: {
+              // `status` is kept in sync with Pesapal's paymentStatus
+              // (COMPLETED -> "success"), and old orders already use it.
               $sum: {
                 $cond: [{ $eq: ["$status", "success"] }, 1, 0],
-                // {
-                //   "year":2025,
-                //   "month":9,
-                //   "total":100,
-                //   "successful":72
-                // }
               },
             },
           },

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { categories, formatDate, getPosts } from "../lib/blog";
 import { AuthorList, PostCover } from "../components/blog/PostCover";
+import { blogFontClass, blogFontStyle } from "../components/blog/blogFont";
 
 export const metadata: Metadata = {
   title: "Blog | FIRST DEPOT",
@@ -41,7 +42,7 @@ const BlogPage = async ({
     }`;
 
   return (
-    <div className="pb-8">
+    <div className={`pb-8 ${blogFontClass}`} style={blogFontStyle}>
       {/* PAGE HEADER */}
       <header className="flex items-end justify-between gap-4 pb-6 pt-8 sm:pb-8 sm:pt-12">
         <div>

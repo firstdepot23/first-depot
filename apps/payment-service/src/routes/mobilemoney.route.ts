@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { shouldBeUser } from "../middleware/authMiddleware";
 import { CartItemsType } from "@repo/types";
-import { PendingPayment } from "@repo/order-db";
-import { getMobileMoneyStatus, initiateMobileMoneyPayment } from "../utils/mobileMoney";
+import { initiateMobileMoneyPayment } from "../utils/mobileMoney";
+import { checkPaymentStatus, placeOrder } from "../utils/orders";
 import clerkClient from "../utils/clerk";
 
 const mobileMoneyRoute = new Hono();
@@ -38,32 +38,24 @@ mobileMoneyRoute.post("/initiate", shouldBeUser, async (c) => {
     const amount = calculateTotal(cart);
     const reference = `mm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    // Remember who is paying and what they bought. The Pesapal IPN only
-    // carries the reference, so the webhook reads this back to build the order.
-    await PendingPayment.create({
-      reference,
-      userId,
-      email,
-      amount,
-      products: cart.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-    });
-
-    const result = await initiateMobileMoneyPayment({
-      amount,
-      reference,
-      description: `Order ${reference}`,
-      billingAddress: {
-        email_address: email,
-        phone_number: phone || user.phoneNumbers[0]?.phoneNumber,
-        first_name: user.firstName ?? undefined,
-        last_name: user.lastName ?? undefined,
-        country_code: "UG",
-      },
-    });
+    // Creates the Order as PENDING, then starts the Pesapal payment. The IPN
+    // and the status endpoint later fill in Pesapal's result on that Order.
+    const result = await placeOrder(
+      { userId, email, amount, merchantReference: reference, cart },
+      () =>
+        initiateMobileMoneyPayment({
+          amount,
+          reference,
+          description: `Order ${reference}`,
+          billingAddress: {
+            email_address: email,
+            phone_number: phone || user.phoneNumbers[0]?.phoneNumber,
+            first_name: user.firstName ?? undefined,
+            last_name: user.lastName ?? undefined,
+            country_code: "UG",
+          },
+        }),
+    );
 
     return c.json(result);
   } catch (error) {
@@ -73,10 +65,14 @@ mobileMoneyRoute.post("/initiate", shouldBeUser, async (c) => {
   }
 });
 
+// `reference` = Pesapal tracking id (what /initiate returns) or our
+// merchant reference - both work.
 mobileMoneyRoute.get("/status/:reference", shouldBeUser, async (c) => {
   try {
     const { reference } = c.req.param();
-    const result = await getMobileMoneyStatus(reference);
+    const result = await checkPaymentStatus(c.get("userId"), reference);
+
+    if (!result) return c.json({ error: "Payment not found" }, 404);
     return c.json(result);
   } catch (error) {
     console.error("mobile money status check failed:", error);

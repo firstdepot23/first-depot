@@ -79,9 +79,11 @@ export const columns: ColumnDef<DataTableFeatures, OrderType>[] = [
     header: () => <div className="text-right">Amount</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("amount"));
-      const formatted = new Intl.NumberFormat("en-US", {
+
+      const formatted = new Intl.NumberFormat("en-UG", {
         style: "currency",
-        currency: "USD",
+        currency: "UGX",
+        maximumFractionDigits: 0,
       }).format(amount);
 
       return <div className="text-right font-medium">{formatted}</div>;

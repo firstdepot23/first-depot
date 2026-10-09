@@ -1,0 +1,73 @@
+/*
+ * Mint page colour for blog posts. Tailwind v4 utilities read the theme
+ * variables (text-gray-900 -> var(--color-gray-900)), so remapping them on
+ * the wrapper recolours every existing class without touching the markup.
+ * Palette = the footer's (#c3e1d6 / #1e4a3c / #0b2e23).
+ */
+.fd-blog-surface {
+  position: relative;
+}
+
+.fd-blog-surface[data-theme="mint"] {
+  background-color: #c3e1d6;
+  /* Bleed the mint sideways to the screen edges, whatever the page width. */
+  box-shadow: 0 0 0 100vmax #c3e1d6;
+  clip-path: inset(0 -100vmax);
+
+  --color-gray-900: #0b2e23;
+  --color-gray-800: #0b2e23;
+  --color-gray-700: #1e4a3c;
+  --color-gray-600: #2a5848;
+  --color-gray-500: #35614f;
+  --color-gray-200: rgba(30, 74, 60, 0.25);
+  --color-gray-100: rgba(255, 255, 255, 0.45);
+  --color-green-50: rgba(255, 255, 255, 0.5);
+  --color-green-500: #0f4a37;
+  --color-green-600: #14573f;
+  --color-green-700: #0b2e23;
+  color: #1e4a3c;
+}
+
+/* ---- the switch ---- */
+.fd-blog-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(30, 74, 60, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0.3rem 0.5rem 0.3rem 0.8rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e4a3c;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.fd-blog-switch:hover { border-color: #1e4a3c; }
+.fd-blog-switch:focus-visible { outline: 2px solid #1e4a3c; outline-offset: 2px; }
+.fd-blog-switch__track {
+  position: relative;
+  width: 2.1rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: #cfd8d4;
+  transition: background-color 0.2s;
+}
+.fd-blog-switch__thumb {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+.fd-blog-switch[aria-checked="true"] { background: #eef8f4; }
+.fd-blog-switch[aria-checked="true"] .fd-blog-switch__track { background: #1e4a3c; }
+.fd-blog-switch[aria-checked="true"] .fd-blog-switch__thumb { transform: translateX(0.9rem); }
+@media (prefers-reduced-motion: reduce) {
+  .fd-blog-switch, .fd-blog-switch__track, .fd-blog-switch__thumb { transition: none; }
+}

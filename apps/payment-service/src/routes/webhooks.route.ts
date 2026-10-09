@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import { PendingPayment } from "@repo/order-db";
-import { producer } from "../utils/kafka";
-import { getPesapalTransactionStatus } from "../utils/pesapal";
+import type { Context } from "hono";
+import { syncOrderWithPesapal } from "../utils/orders";
 
 const webhookRoute = new Hono();
 
@@ -13,92 +12,87 @@ webhookRoute.get("/", (c) => {
   });
 });
 
-// Pesapal's IPN. Registered as a GET notification type in
-// registerPesapalIpn() (utils/pesapal.ts).
-//
-// The OrderTrackingId/OrderMerchantReference sent here are just a "go check"
-// signal, not proof of payment - we always re-fetch the real status via
-// GetTransactionStatus before treating anything as paid.
-webhookRoute.get("/pesapal", async (c) => {
-  const orderTrackingId = c.req.query("OrderTrackingId");
-  const orderMerchantReference = c.req.query("OrderMerchantReference");
+// Pesapal expects this exact shape back. status 200 = received and processed,
+// 500 = received but something went wrong (Pesapal will call again).
+const ipnReply = (
+  c: Context,
+  orderTrackingId: string,
+  orderMerchantReference: string,
+  status: 200 | 500,
+) =>
+  c.json(
+    {
+      orderNotificationType: "IPNCHANGE",
+      orderTrackingId,
+      orderMerchantReference,
+      status,
+    },
+    status,
+  );
 
-  console.log("pesapal IPN received:", { orderTrackingId, orderMerchantReference });
+// The IPN only says "this transaction changed" - it is NOT proof of payment.
+// We always ask Pesapal for the real status (GetTransactionStatus) and store
+// that result on the Order.
+const handleIpn = async (
+  c: Context,
+  orderTrackingId?: string,
+  orderMerchantReference?: string,
+) => {
+  console.log("pesapal IPN received:", {
+    orderTrackingId,
+    orderMerchantReference,
+  });
 
-  if (!orderTrackingId || !orderMerchantReference) {
-    return c.json(
-      { error: "Missing OrderTrackingId/OrderMerchantReference" },
-      400,
-    );
+  if (!orderTrackingId) {
+    return c.json({ error: "Missing OrderTrackingId" }, 400);
   }
 
   try {
-    const result = await getPesapalTransactionStatus(orderTrackingId);
+    const { order, notifyFailed } = await syncOrderWithPesapal(
+      orderTrackingId,
+      orderMerchantReference,
+    );
 
-    if (result.status_code === 1) {
-      // Atomically claim the pending payment so Pesapal's repeated IPN
-      // calls can't create duplicate orders.
-      const pending = await PendingPayment.findOneAndUpdate(
-        { reference: orderMerchantReference, processed: false },
-        { processed: true },
-      );
+    console.log(
+      `pesapal IPN: ${order.merchantReference} -> ${order.paymentStatus}`,
+    );
 
-      if (!pending) {
-        console.log(
-          "pesapal IPN: unknown or already processed:",
-          orderMerchantReference,
-        );
-      } else {
-        try {
-          await producer.send("payment.successful", {
-            value: {
-              userId: pending.userId,
-              email: pending.email,
-              amount: pending.amount,
-              status: "success",
-              products: pending.products.map((p) => ({
-                name: p.name,
-                quantity: p.quantity,
-                price: p.price,
-              })),
-            },
-          });
-          console.log(
-            "pesapal IPN: published payment.successful for",
-            orderMerchantReference,
-          );
-        } catch (err) {
-          // Release the claim so Pesapal's retry can succeed.
-          await PendingPayment.updateOne(
-            { reference: orderMerchantReference },
-            { processed: false },
-          );
-          throw err; // outer catch returns 500 so Pesapal retries
-        }
-      }
-    } else if (result.status_code === 2 || result.status_code === 3) {
-      // Nothing consumes a "payment.failed" topic yet (and the Kafka plan
-      // limits topics), so just log it.
-      console.log(
-        "Pesapal payment failed:",
-        orderMerchantReference,
-        orderTrackingId,
-        result.payment_method,
-      );
-    }
-    // status_code 0: still pending - Pesapal calls the IPN again on change.
+    // Order is saved, but the confirmation event couldn't be published:
+    // answer 500 so Pesapal calls again and we retry publishing.
+    return ipnReply(
+      c,
+      orderTrackingId,
+      orderMerchantReference ?? order.merchantReference,
+      notifyFailed ? 500 : 200,
+    );
   } catch (error) {
     console.error("pesapal IPN handling failed:", error);
-    return c.json({ error: "Failed to process IPN" }, 500);
+    return ipnReply(c, orderTrackingId, orderMerchantReference ?? "", 500);
   }
+};
 
-  // Pesapal expects this exact echoed shape to mark the IPN as delivered.
-  return c.json({
-    orderNotificationType: "IPNCHANGE",
-    orderTrackingId,
-    orderMerchantReference,
-    status: 200,
-  });
+// Registered as a GET notification type in registerPesapalIpn() (utils/pesapal.ts).
+webhookRoute.get("/pesapal", (c) =>
+  handleIpn(
+    c,
+    c.req.query("OrderTrackingId"),
+    c.req.query("OrderMerchantReference"),
+  ),
+);
+
+// Same handler for the POST notification type, in case the IPN is ever
+// registered as POST.
+webhookRoute.post("/pesapal", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    OrderTrackingId?: string;
+    OrderMerchantReference?: string;
+  };
+
+  return handleIpn(
+    c,
+    body.OrderTrackingId ?? c.req.query("OrderTrackingId"),
+    body.OrderMerchantReference ?? c.req.query("OrderMerchantReference"),
+  );
 });
 
 export default webhookRoute;
