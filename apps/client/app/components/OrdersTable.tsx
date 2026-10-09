@@ -13,53 +13,83 @@ import { useMemo, useState } from "react";
 type SortKey = "date" | "amount";
 type SortDirection = "asc" | "desc";
 
-const STATUS_STYLES: Record<string, string> = {
-  success: "bg-green-50 text-green-700",
-  successful: "bg-green-50 text-green-700",
-  pending: "bg-amber-50 text-amber-700",
-  failed: "bg-red-50 text-red-700",
+// Pesapal payment statuses (see the order model in @repo/order-db).
+type DisplayStatus = "COMPLETED" | "PENDING" | "FAILED" | "REVERSED";
+
+const STATUS_LABELS: Record<DisplayStatus, string> = {
+  COMPLETED: "Completed",
+  PENDING: "Pending",
+  FAILED: "Failed",
+  REVERSED: "Reversed",
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
-  const style =
-    STATUS_STYLES[status.toLowerCase()] ?? "bg-gray-100 text-gray-600";
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${style}`}
-    >
-      {status}
-    </span>
-  );
+const STATUS_STYLES: Record<DisplayStatus, string> = {
+  COMPLETED: "bg-green-50 text-green-700",
+  PENDING: "bg-amber-50 text-amber-700",
+  FAILED: "bg-red-50 text-red-700",
+  REVERSED: "bg-gray-100 text-gray-700",
 };
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  stripe: "Stripe",
-  mobile_money: "Mobile Money",
-  bank_card: "Bank Card",
+const getDisplayStatus = (order: OrderType): DisplayStatus => {
+  const status = String(order.paymentStatus ?? "").toUpperCase();
+  if (
+    status === "COMPLETED" ||
+    status === "PENDING" ||
+    status === "FAILED" ||
+    status === "REVERSED"
+  ) {
+    return status;
+  }
+
+  // Orders saved before Pesapal statuses existed only have the old field.
+  if (order.status === "success") return "COMPLETED";
+  if (order.status === "failed") return "FAILED";
+  return "PENDING";
 };
 
-const PAYMENT_METHOD_ICONS: Record<string, typeof Wallet> = {
-  stripe: Wallet,
-  mobile_money: Smartphone,
-  bank_card: CreditCard,
+const StatusBadge = ({ status }: { status: DisplayStatus }) => (
+  <span
+    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}
+  >
+    {STATUS_LABELS[status]}
+  </span>
+);
+
+// Pesapal returns the method as free text in `payment_method`
+// (e.g. "Visa", "MasterCard", "MTN", "Airtel"), so show it as-is and only
+// pick an icon from the name.
+const getMethodIcon = (method: string) => {
+  if (/visa|master|card|amex/i.test(method)) return CreditCard;
+  if (/mtn|airtel|mpesa|tigo|mobile|money/i.test(method)) return Smartphone;
+  return Wallet;
 };
 
-const PaymentMethodBadge = ({ method }: { method?: string | null }) => {
+const PaymentMethodBadge = ({
+  method,
+  account,
+}: {
+  method?: string | null;
+  account?: string | null;
+}) => {
   if (!method) return <span className="text-gray-400">-</span>;
 
-  const Icon = PAYMENT_METHOD_ICONS[method] ?? Wallet;
-  const label = PAYMENT_METHOD_LABELS[method] ?? method;
+  const Icon = getMethodIcon(method);
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-gray-700">
-      <Icon className="w-3.5 h-3.5 text-gray-400" />
-      {label}
-    </span>
+    <div className="flex flex-col">
+      <span className="inline-flex items-center gap-1.5 text-gray-700">
+        <Icon className="w-3.5 h-3.5 text-gray-400" />
+        {method}
+      </span>
+      {account && (
+        <span className="font-mono text-xs text-gray-400">{account}</span>
+      )}
+    </div>
   );
 };
 
-const formatAmount = (amount: number) =>
-  `UGX ${amount.toLocaleString("en-UG")}`;
+const formatAmount = (amount: number, currency?: string | null) =>
+  `${currency || "UGX"} ${amount.toLocaleString("en-UG")}`;
 
 const formatDate = (date: string | Date | undefined) =>
   date
@@ -78,7 +108,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const statusOptions = useMemo(() => {
-    const seen = new Set(orders.map((o) => o.status).filter(Boolean));
+    const seen = new Set<string>(orders.map(getDisplayStatus));
     return ["all", ...Array.from(seen)];
   }, [orders]);
 
@@ -92,7 +122,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
 
     const filtered = orders.filter((order) => {
       const matchesStatus =
-        statusFilter === "all" || order.status === statusFilter;
+        statusFilter === "all" || getDisplayStatus(order) === statusFilter;
       const matchesMethod =
         methodFilter === "all" || order.paymentMethod === methodFilter;
 
@@ -105,9 +135,17 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
           .join(" ")
           .toLowerCase() ?? "";
 
-      return (
-        order._id.toLowerCase().includes(query) || productNames.includes(query)
-      );
+      const references = [
+        order._id,
+        order.merchantReference,
+        order.orderTrackingId,
+        order.confirmationCode,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return references.includes(query) || productNames.includes(query);
     });
 
     const sorted = [...filtered].sort((a, b) => {
@@ -175,7 +213,9 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
           >
             {statusOptions.map((status) => (
               <option key={status} value={status}>
-                {status === "all" ? "All statuses" : status}
+                {status === "all"
+                  ? "All statuses"
+                  : STATUS_LABELS[status as DisplayStatus]}
               </option>
             ))}
           </select>
@@ -189,9 +229,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
           >
             {methodOptions.map((method) => (
               <option key={method} value={method}>
-                {method === "all"
-                  ? "All payment methods"
-                  : (PAYMENT_METHOD_LABELS[method] ?? method)}
+                {method === "all" ? "All payment methods" : method}
               </option>
             ))}
           </select>
@@ -252,7 +290,12 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                       {formatDate(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                      {order._id.slice(-8)}
+                      <div>{order._id.slice(-8)}</div>
+                      {order.confirmationCode && (
+                        <div className="text-gray-400">
+                          {order.confirmationCode}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {firstProducts.length > 0
@@ -262,13 +305,16 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                         : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <PaymentMethodBadge method={order.paymentMethod} />
+                      <PaymentMethodBadge
+                        method={order.paymentMethod}
+                        account={order.paymentAccount}
+                      />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-800">
-                      {formatAmount(order.amount)}
+                      {formatAmount(order.amount, order.currency)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={order.status ?? "unknown"} />
+                      <StatusBadge status={getDisplayStatus(order)} />
                     </td>
                   </tr>
                 );

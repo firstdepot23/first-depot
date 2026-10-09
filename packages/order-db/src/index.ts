@@ -1,4 +1,9 @@
-export { Order, type OrderSchemaType, OrderStatus } from "./order-model";
-export { PendingPayment } from "./pending-payment-model";
+export {
+  Order,
+  type OrderSchemaType,
+  OrderStatus,
+  PaymentStatus,
+  type PaymentStatusType,
+} from "./order-model";
 
 export { connectOrderDB } from "./connection";

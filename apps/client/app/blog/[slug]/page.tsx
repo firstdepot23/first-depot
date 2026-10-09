@@ -5,6 +5,8 @@ import { formatDate, getMorePosts, getPost } from "../../lib/blog";
 import { AuthorList, PostCover } from "../../components/blog/PostCover";
 // Copy rich-text.tsx into the storefront at components/blog/rich-text.tsx
 import { RichBody } from "../../components/blog/richText";
+import { blogFontClass, blogFontStyle } from "../../components/blog/blogFont";
+import { BlogSurface, BlogThemeSwitch } from "../../components/blog/BlogSurface";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -43,13 +45,17 @@ const BlogPostPage = async ({ params }: Props) => {
   const more = await getMorePosts(post.slug, 2);
 
   return (
-    <div className="pb-8 pt-6 sm:pt-10">
-      <Link
-        href="/blog"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 transition-colors hover:text-green-500"
-      >
-        <Chevron flip /> All posts
-      </Link>
+    <div className={blogFontClass} style={blogFontStyle}>
+    <BlogSurface className="pb-8 pt-6 sm:pt-10">
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/blog"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 transition-colors hover:text-green-500"
+        >
+          <Chevron flip /> All posts
+        </Link>
+        <BlogThemeSwitch />
+      </div>
 
       <article className="mx-auto mt-8 max-w-3xl">
         <p className="border-l-2 border-green-600 pl-3 text-sm font-medium text-green-600">
@@ -98,6 +104,7 @@ const BlogPostPage = async ({ params }: Props) => {
           ))}
         </ul>
       </section>
+    </BlogSurface>
     </div>
   );
 };

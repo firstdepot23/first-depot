@@ -72,7 +72,7 @@ const fetchData = async ({
   if (category) query.set("category", category);
   if (search) query.set("search", search);
   query.set("sort", sort || "newest");
-  if (params === "homepage") query.set("limit", "8");
+  if (params === "homepage") query.set("limit", "10");
 
   try {
     const res = await fetchWithRetry(`${baseUrl}/products?${query.toString()}`);

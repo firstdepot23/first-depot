@@ -4,8 +4,6 @@ import { clerkPlugin } from "@clerk/fastify";
 import { shouldBeUser } from "./middleware/authMiddleware.js";
 import { connectOrderDB } from "@repo/order-db";
 import { orderRoute } from "./routes/order.js";
-import { consumer, producer } from "./utils/kafka.js";
-import { runKafkaSubscriptions } from "./utils/subscriptions.js";
 import cors from "@fastify/cors";
 
 const fastify = Fastify();
@@ -65,6 +63,8 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string) =>
     );
   });
 
+// The order service only READS orders now. The payment service creates and
+// updates them from Pesapal, so no Kafka consumer is needed here.
 const start = async () => {
   try {
     await fastify.listen({ port, host: "0.0.0.0" });
@@ -72,22 +72,10 @@ const start = async () => {
 
     await withTimeout(connectOrderDB(), 60_000, "MongoDB connection");
     console.log("MongoDB ready");
-
-    await withTimeout(producer.connect(), 60_000, "Kafka producer connection");
-    console.log("Kafka producer ready");
-
-    await withTimeout(consumer.connect(), 60_000, "Kafka consumer connection");
-    console.log("Kafka consumer ready");
   } catch (err) {
     console.error("Order service failed to start:", err);
     process.exit(1);
   }
-
-  // Joining the consumer group can be slow. A slow join must NOT kill the
-  // service (a restart could make us miss payment.successful messages).
-  runKafkaSubscriptions()
-    .then(() => console.log("Kafka subscriptions ready"))
-    .catch((err) => console.error("Kafka subscriptions failed:", err));
 };
 
 start();
