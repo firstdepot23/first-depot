@@ -28,7 +28,7 @@ export const quoteItemSchema = z.object({
   name: z.string().trim().min(1, "Describe the item").max(200),
   unit: z.string().trim().max(40),
   quantity: z
-    .number("Enter a quantity")
+    .number({ message: "Enter a quantity" })
     .positive("Quantity must be more than 0")
     .max(1_000_000, "Quantity is too large"),
   unitPrice: z.number().min(0).max(1_000_000_000).nullable(),
