@@ -16,7 +16,7 @@ const serif = Source_Serif_4({
 
 export const metadata: Metadata = {
   title: {
-    default: `Documents | ${company.legalName}`,
+    default: `Documents | ${company.name}`,
     template: `%s | ${company.name}`,
   },
   description: `Policies, help and product information from ${company.legalName}.`,

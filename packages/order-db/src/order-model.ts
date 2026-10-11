@@ -18,15 +18,32 @@ export type PaymentStatusType = (typeof PaymentStatus)[number];
 //   COMPLETED -> "success", FAILED/REVERSED -> "failed", PENDING -> "pending"
 export const OrderStatus = ["success", "failed", "pending"] as const;
 
+export const DeliveryMethods = ["pickup", "delivery"] as const;
+
 // NOTE: no schema `default`s on paymentStatus/status on purpose. Mongoose
 // applies defaults to old documents when it loads them, which would make every
 // old successful order look "PENDING". The payment service sets them explicitly.
 const OrderSchema = new Schema(
   {
     userId: { type: String, required: true },
-    email: { type: String, required: true },
+    email: { type: String, required: true }, // the customer's account email
+
+    // amount = subtotal + deliveryFee = what Pesapal charges.
     amount: { type: Number, required: true },
+    subtotal: { type: Number },
+    deliveryFee: { type: Number },
     currency: { type: String }, // Pesapal: currency
+
+    // --- Shipping / delivery (from the shipping step) ---
+    deliveryMethod: { type: String, enum: DeliveryMethods },
+    deliveryCity: { type: String }, // key of the chosen city, e.g. "gulu" (delivery only)
+    shipping: {
+      name: { type: String },
+      email: { type: String },
+      phone: { type: String },
+      address: { type: String }, // for pickup: the station's address
+      city: { type: String },
+    },
 
     products: {
       type: [
@@ -34,6 +51,10 @@ const OrderSchema = new Schema(
           name: { type: String, required: true },
           quantity: { type: Number, required: true },
           price: { type: Number, required: true },
+          // Which cart line this was, so the cart can be cleared after payment.
+          productId: { type: String },
+          selectedSize: { type: String },
+          selectedColor: { type: String },
         },
       ],
       required: true,
@@ -57,6 +78,9 @@ const OrderSchema = new Schema(
 
     // true once the "order.created" confirmation email event was published.
     confirmationSent: { type: Boolean },
+    // false until the customer's cart has been emptied of this order's items.
+    // Only new orders have it, so old orders never touch anyone's cart.
+    cartCleared: { type: Boolean },
   },
   { timestamps: true },
 );

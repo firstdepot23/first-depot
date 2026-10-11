@@ -143,9 +143,9 @@ const NAV: NavItem[] = [
         links: [
           { label: "Blog", href: "/blog", desc: "Guides, ideas and news" },
           {
-            label: "Buying guides",
-            href: "/blog?category=Guides",
-            desc: "Choose with confidence",
+            label: "Select Colors",
+            href: "/colors",
+            desc: "Choose a Color with confidence",
           },
         ],
       },

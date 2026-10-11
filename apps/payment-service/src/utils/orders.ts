@@ -4,8 +4,17 @@ import {
   getPesapalTransactionStatus,
   type PesapalTransactionStatus,
 } from "./pesapal";
+import type { DeliveryCity, DeliveryMethod } from "./delivery";
+import type { Shipping } from "./checkout";
 
-export type CartLine = { name: string; quantity: number; price: number };
+export type CartLine = {
+  id: string | number;
+  name: string;
+  quantity: number;
+  price: number;
+  selectedSize: string;
+  selectedColor: string;
+};
 
 // Pesapal status_code: 0 INVALID, 1 COMPLETED, 2 FAILED, 3 REVERSED.
 export const toPaymentStatus = (
@@ -59,35 +68,50 @@ const CAN_REPLACE: Record<PaymentStatusType, PaymentStatusType[] | null> = {
   PENDING: ["PENDING"],
 };
 
+export type OrderDraft = {
+  userId: string;
+  email: string;
+  merchantReference: string;
+  cart: CartLine[];
+  subtotal: number;
+  deliveryFee: number;
+  amount: number; // subtotal + deliveryFee: what Pesapal charges
+  deliveryMethod: DeliveryMethod;
+  deliveryCity: DeliveryCity;
+  shipping: Shipping;
+};
+
 /**
  * Creates the Order (status PENDING) BEFORE the customer pays, then starts the
- * Pesapal payment. This replaces the old PendingPayment collection: the Order
- * itself remembers who is paying and what they bought, and Pesapal's
- * IPN / status calls update it in place.
+ * Pesapal payment. The Order itself remembers who is paying, what they bought
+ * and where it goes, and Pesapal's IPN / status calls update it in place.
  */
 export const placeOrder = async <T extends { reference: string }>(
-  input: {
-    userId: string;
-    email: string;
-    amount: number;
-    merchantReference: string;
-    cart: CartLine[];
-  },
+  input: OrderDraft,
   startPayment: () => Promise<T>,
 ): Promise<T> => {
   const order = await Order.create({
     userId: input.userId,
     email: input.email,
     amount: input.amount,
+    subtotal: input.subtotal,
+    deliveryFee: input.deliveryFee,
     currency: "UGX",
+    deliveryMethod: input.deliveryMethod,
+    deliveryCity: input.deliveryCity,
+    shipping: input.shipping,
     merchantReference: input.merchantReference,
     paymentStatus: "PENDING",
     status: "pending",
     confirmationSent: false,
+    cartCleared: false,
     products: input.cart.map((item) => ({
       name: item.name,
       quantity: item.quantity,
       price: item.price,
+      productId: String(item.id),
+      selectedSize: item.selectedSize,
+      selectedColor: item.selectedColor,
     })),
   });
 
@@ -186,6 +210,16 @@ const announceOrder = async (orderId: unknown): Promise<boolean> => {
         email: claimed.email,
         amount: claimed.amount,
         status: "success",
+        deliveryMethod: claimed.deliveryMethod,
+        deliveryFee: claimed.deliveryFee,
+        shipping: claimed.shipping
+          ? {
+              name: claimed.shipping.name,
+              phone: claimed.shipping.phone,
+              address: claimed.shipping.address,
+              city: claimed.shipping.city,
+            }
+          : undefined,
       },
     });
     return true;
@@ -255,4 +289,76 @@ export const checkPaymentStatus = async (userId: string, reference: string) => {
     console.error("status sync failed, returning stored status:", error);
     return toStatusResponse(existing);
   }
+};
+
+// ---------------------------------------------------------------------------
+// Emptying the cart after a successful payment
+// ---------------------------------------------------------------------------
+
+const RECENT_PENDING_MS = 30 * 60 * 1000;
+
+// Re-checks (with Pesapal) payments the customer started in the last 30
+// minutes, so a completed payment is noticed without waiting for the IPN.
+const syncRecentPending = async (userId: string) => {
+  const pending = await Order.find({
+    userId,
+    paymentStatus: "PENDING",
+    orderTrackingId: { $exists: true, $ne: null },
+    createdAt: { $gte: new Date(Date.now() - RECENT_PENDING_MS) },
+  })
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+  await Promise.allSettled(
+    pending.map((order) =>
+      syncOrderWithPesapal(order.orderTrackingId as string, order.merchantReference),
+    ),
+  );
+};
+
+/**
+ * COMPLETED orders whose items are still waiting to be removed from the
+ * customer's cart. FAILED / PENDING orders are never returned, so a payment
+ * that didn't go through leaves the cart untouched.
+ */
+export const getPaidOrderLines = async (userId: string) => {
+  await syncRecentPending(userId).catch((error) =>
+    console.error("syncRecentPending failed:", error),
+  );
+
+  const orders = await Order.find({
+    userId,
+    paymentStatus: "COMPLETED",
+    cartCleared: false, // only new orders have this; old orders are ignored
+  }).limit(20);
+
+  return orders.map((order) => ({
+    merchantReference: order.merchantReference,
+    lines: order.products.flatMap((p) =>
+      p.productId
+        ? [
+            {
+              productId: p.productId,
+              selectedSize: p.selectedSize ?? "",
+              selectedColor: p.selectedColor ?? "",
+            },
+          ]
+        : [],
+    ),
+  }));
+};
+
+/** The customer's cart was saved without these orders' items. */
+export const markCartCleared = async (
+  userId: string,
+  merchantReferences: string[],
+) => {
+  await Order.updateMany(
+    {
+      userId,
+      merchantReference: { $in: merchantReferences },
+      paymentStatus: "COMPLETED",
+    },
+    { $set: { cartCleared: true } },
+  );
 };

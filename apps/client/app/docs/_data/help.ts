@@ -1,5 +1,15 @@
+import {
+  DELIVERY_CITIES,
+  DELIVERY_CITY_INFO,
+  PICKUP_STATION,
+} from "@repo/types";
 import { company as c } from "./company";
 import { p, h3, ul, table, note, type DocPage } from "./schema";
+
+// Delivery fees come from the same list the cart and checkout use
+// (packages/types/src/cart.ts), so this page can never disagree with what
+// customers are charged.
+const ugx = (amount: number) => `UGX ${amount.toLocaleString("en-US")}`;
 
 export const help: DocPage = {
   slug: "help-center",
@@ -20,7 +30,7 @@ export const help: DocPage = {
       blocks: [
         h3("How do I place an order?"),
         p(
-          `Add items to your basket, check out, and pay. You will get a confirmation message once your order is accepted, and updates as it is prepared and delivered.`,
+          `Add items to your cart, choose pickup or delivery, and pay. You will get a confirmation message once your order is accepted, and updates as it is prepared and delivered.`,
         ),
         h3("Can I change or cancel an order?"),
         p(
@@ -50,17 +60,33 @@ export const help: DocPage = {
       id: "delivery",
       title: "Delivery",
       blocks: [
+        p(
+          `At checkout you choose how to get your order: collect it from our station for free, or have it delivered to your address in any city in Uganda. Delivery is charged per city, and the fee is added to your total before you pay.`,
+        ),
         table(
-          ["Area", "Estimated time", "Fee"],
-          ["Lira City", "Same day or next day", "From UGX 5,000"],
-          ["Greater Kampala", "1 to 2 working days", "From UGX 15,000"],
-          ["Rest of Uganda", "2 to 5 working days", "Quoted at checkout"],
+          ["Where", "Estimated time", "Fee"],
+          [
+            `Pickup from our station (${PICKUP_STATION.city})`,
+            "Ready within a few hours",
+            "Free",
+          ],
+          ...DELIVERY_CITIES.map((key) => [
+            DELIVERY_CITY_INFO[key].label,
+            DELIVERY_CITY_INFO[key].eta,
+            ugx(DELIVERY_CITY_INFO[key].fee),
+          ]),
         ),
         note(
-          `Fees and times shown are examples. Heavy loads, such as cement and iron sheets, are priced by weight and distance.`,
+          `Delivery fees are fixed per city, based on the distance from our dispatch point in Lira. Heavy loads, such as cement and iron sheets, may cost more because they are priced by weight and distance. If that applies to your order, we will call you before dispatch.`,
         ),
         h3("Can I collect my order?"),
-        p(`Yes. Choose showroom pickup at checkout and we will message you when it is ready, usually within a few hours.`),
+        p(
+          `Yes, and it is free. Choose *Pick up from our station* at checkout and we will message you when it is ready, usually within a few hours. Our station is at ${PICKUP_STATION.address}, ${PICKUP_STATION.city}.`,
+        ),
+        h3("My town is not on the list."),
+        p(
+          `Choose *Other town in Uganda* at checkout and type your town. It uses the standard fee shown above, and we will tell you if your location needs a different quote.`,
+        ),
       ],
     },
     {

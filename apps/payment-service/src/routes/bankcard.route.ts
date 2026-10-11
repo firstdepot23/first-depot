@@ -3,12 +3,10 @@ import { shouldBeUser } from "../middleware/authMiddleware";
 import { CartItemsType } from "@repo/types";
 import { initiateCardPayment } from "../utils/bankCard";
 import { checkPaymentStatus, placeOrder } from "../utils/orders";
+import { CheckoutError, prepareCheckout } from "../utils/checkout";
 import clerkClient from "../utils/clerk";
 
 const bankCardRoute = new Hono();
-
-const calculateTotal = (cart: CartItemsType) =>
-  cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
 // No card details are accepted here. We create a Pesapal order and return
 // the URL of Pesapal's hosted payment page; the customer enters their card
@@ -34,23 +32,28 @@ bankCardRoute.post("/initiate", shouldBeUser, async (c) => {
       );
     }
 
-    const amount = calculateTotal(cart);
+    // Delivery details saved on the shipping step + the delivery fee + total,
+    // all worked out here on the server.
+    const checkout = await prepareCheckout(userId, cart);
     const reference = `card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const [firstName, ...restName] = checkout.shipping.name.split(" ");
 
     // Creates the Order as PENDING, then starts the Pesapal payment. The IPN
     // and the status endpoint later fill in Pesapal's result on that Order.
     const result = await placeOrder(
-      { userId, email, amount, merchantReference: reference, cart },
+      { userId, email, merchantReference: reference, cart, ...checkout },
       () =>
         initiateCardPayment({
-          amount,
+          amount: checkout.amount,
           reference,
           description: `Order ${reference}`,
           billingAddress: {
             email_address: email,
-            phone_number: user.phoneNumbers[0]?.phoneNumber,
-            first_name: user.firstName ?? undefined,
-            last_name: user.lastName ?? undefined,
+            phone_number:
+              checkout.shipping.phone || user.phoneNumbers[0]?.phoneNumber,
+            first_name: user.firstName ?? firstName ?? undefined,
+            last_name: user.lastName ?? (restName.join(" ") || undefined),
             country_code: "UG",
           },
         }),
@@ -58,6 +61,9 @@ bankCardRoute.post("/initiate", shouldBeUser, async (c) => {
 
     return c.json(result);
   } catch (error) {
+    if (error instanceof CheckoutError) {
+      return c.json({ error: error.message }, 400);
+    }
     console.error("bank card initiate failed:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return c.json({ error: message }, 500);
