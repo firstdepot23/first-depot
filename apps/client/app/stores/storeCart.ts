@@ -28,6 +28,7 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
     isLoaded: false,
     loadError: null,
     reloadKey: 0,
+    reconcileKey: 0,
     addToCart: (product) =>
       set((state) => {
         const existingIndex = state.cart.findIndex((p) =>
@@ -80,6 +81,9 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
     setLoadError: (message) => set({ loadError: message }),
     requestReload: () =>
       set((state) => ({ loadError: null, reloadKey: state.reloadKey + 1 })),
+    // Asks CartSync to remove items the customer has already paid for.
+    requestReconcile: () =>
+      set((state) => ({ reconcileKey: state.reconcileKey + 1 })),
   }),
 );
 

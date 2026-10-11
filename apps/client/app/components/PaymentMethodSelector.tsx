@@ -1,11 +1,12 @@
 "use client";
 
-import { ShippingFormInputs } from "@repo/types";
+import { getDeliveryFee } from "@repo/types";
 import { useState } from "react";
 import { CreditCard, Smartphone } from "lucide-react";
 import MobileMoneyForm from "./MobileMoneyForm";
 import BankCardForm from "./BankCardForm";
 import useCartStore from "../stores/storeCart";
+import useCheckoutStore from "../stores/storeCheckout";
 
 type PaymentMethod = "mobile_money" | "bank_card";
 
@@ -29,16 +30,22 @@ const OPTIONS: {
   },
 ];
 
-// `shippingForm` is no longer used here (it was only needed by the Stripe
-// form). It's kept as an optional prop so the parent page that still passes
-// it keeps compiling; you can remove it from the parent whenever convenient.
-const PaymentMethodSelector = (_props: {
-  shippingForm?: ShippingFormInputs;
-}) => {
+// The delivery details are saved on the server when the shipping step is
+// submitted, and the payment service adds the delivery fee itself when the
+// payment starts. The fee shown here is the same number, so the "Total to
+// pay" matches what is charged.
+const PaymentMethodSelector = () => {
   const [method, setMethod] = useState<PaymentMethod | null>(null);
-  const { cart } = useCartStore();
+  const cart = useCartStore((state) => state.cart);
+  const deliveryMethod = useCheckoutStore((state) => state.deliveryMethod);
+  const deliveryCity = useCheckoutStore((state) => state.deliveryCity);
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+  const deliveryFee = getDeliveryFee(deliveryMethod, deliveryCity);
+  const total = subtotal + deliveryFee;
 
   const renderForm = (id: PaymentMethod) => {
     if (method !== id) return null;
@@ -48,11 +55,23 @@ const PaymentMethodSelector = (_props: {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
-      <div className="flex items-center justify-between gap-3 rounded-md bg-gray-50 px-3 py-3 sm:px-4">
-        <span className="text-sm text-gray-500">Total to pay</span>
-        <span className="text-base font-semibold sm:text-lg">
-          UGX {total.toLocaleString()}
-        </span>
+      <div className="flex flex-col gap-2 rounded-md bg-gray-50 px-3 py-3 sm:px-4">
+        <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
+          <span>Subtotal</span>
+          <span>UGX {subtotal.toLocaleString()}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
+          <span>{deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</span>
+          <span>
+            {deliveryFee === 0 ? "Free" : `UGX ${deliveryFee.toLocaleString()}`}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-2">
+          <span className="text-sm text-gray-500">Total to pay</span>
+          <span className="text-base font-semibold sm:text-lg">
+            UGX {total.toLocaleString()}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

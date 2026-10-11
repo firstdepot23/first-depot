@@ -9,6 +9,80 @@ export type CartItemType = Product & {
 
 export type CartItemsType = CartItemType[];
 
+// ---------------------------------------------------------------------------
+// Delivery
+//
+// The customer picks ONE of two ways to get their order:
+//   - "pickup":   collect from our station, free
+//   - "delivery": delivered to their address, fee depends on the CITY
+//
+// Fees are per city, based on distance from our dispatch point in Lira
+// (parcel / courier scale). Heavy loads such as cement and iron sheets can
+// cost more; we contact the customer before dispatch if that applies.
+//
+// The payment service has its own copy of the fees
+// (apps/payment-service/src/utils/delivery.ts) because it is what actually
+// charges the customer. KEEP THE TWO IN SYNC when you change a fee.
+// ---------------------------------------------------------------------------
+export const DELIVERY_METHODS = ["pickup", "delivery"] as const;
+export type DeliveryMethod = (typeof DELIVERY_METHODS)[number];
+
+// Order here = order in the city dropdown. "other" must stay last.
+export const DELIVERY_CITIES = [
+  "lira",
+  "arua",
+  "entebbe",
+  "fort_portal",
+  "gulu",
+  "hoima",
+  "jinja",
+  "kabale",
+  "kampala",
+  "masaka",
+  "mbale",
+  "mbarara",
+  "soroti",
+  "other",
+] as const;
+export type DeliveryCity = (typeof DELIVERY_CITIES)[number];
+
+export const DELIVERY_CITY_INFO: Record<
+  DeliveryCity,
+  { label: string; fee: number; eta: string }
+> = {
+  lira: { label: "Lira City", fee: 5_000, eta: "Same day or next day" },
+  arua: { label: "Arua", fee: 15_000, eta: "2 to 3 working days" },
+  entebbe: { label: "Entebbe", fee: 15_000, eta: "1 to 2 working days" },
+  fort_portal: {
+    label: "Fort Portal",
+    fee: 25_000,
+    eta: "3 to 5 working days",
+  },
+  gulu: { label: "Gulu", fee: 10_000, eta: "1 to 2 working days" },
+  hoima: { label: "Hoima", fee: 15_000, eta: "2 to 3 working days" },
+  jinja: { label: "Jinja", fee: 15_000, eta: "2 to 3 working days" },
+  kabale: { label: "Kabale", fee: 25_000, eta: "3 to 5 working days" },
+  kampala: { label: "Kampala", fee: 15_000, eta: "1 to 2 working days" },
+  masaka: { label: "Masaka", fee: 20_000, eta: "2 to 4 working days" },
+  mbale: { label: "Mbale", fee: 15_000, eta: "2 to 3 working days" },
+  mbarara: { label: "Mbarara", fee: 20_000, eta: "2 to 4 working days" },
+  soroti: { label: "Soroti", fee: 10_000, eta: "1 to 2 working days" },
+  other: {
+    label: "Other town in Uganda",
+    fee: 25_000,
+    eta: "2 to 5 working days",
+  },
+};
+
+// Where customers collect free pickup orders. Edit to your real station.
+export const PICKUP_STATION = {
+  address: "First Depot station",
+  city: "Lira City",
+};
+
+export const getDeliveryFee = (method: DeliveryMethod, city: DeliveryCity) =>
+  method === "delivery" ? DELIVERY_CITY_INFO[city].fee : 0;
+
 export const shippingFormSchema = z.object({
   name: z.string().min(1, "Name is required!"),
   email: z
@@ -20,8 +94,12 @@ export const shippingFormSchema = z.object({
     .min(7, "Phone number must be between 7 and 10 digits!")
     .max(10, "Phone number must be between 7 and 10 digits!")
     .regex(/^\d+$/, "Phone number must contain only numbers!"),
+  // For pickup, address and city are filled in with the station's by the form.
+  // For delivery, `city` is the chosen city (or the typed town for "other").
   address: z.string().min(1, "Address is required!"),
   city: z.string().min(1, "City is required!"),
+  deliveryMethod: z.enum(DELIVERY_METHODS),
+  deliveryCity: z.enum(DELIVERY_CITIES),
 });
 
 export type ShippingFormInputs = z.infer<typeof shippingFormSchema>;
@@ -40,6 +118,9 @@ export type CartStoreStateType = {
   loadError: string | null;
   // Bumped by requestReload() to make CartSync fetch the cart again.
   reloadKey: number;
+  // Bumped by requestReconcile() to make CartSync remove items that were
+  // already paid for (see CartSync).
+  reconcileKey: number;
 };
 
 export type CartStoreActionsType = {
@@ -60,4 +141,6 @@ export type CartStoreActionsType = {
   setLoadError: (message: string | null) => void;
   // Clears any load error and asks CartSync to fetch the cart again.
   requestReload: () => void;
+  // Asks CartSync to check for paid orders and drop their items from the cart.
+  requestReconcile: () => void;
 };

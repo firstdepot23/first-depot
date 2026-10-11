@@ -88,6 +88,31 @@ const PaymentMethodBadge = ({
   );
 };
 
+const DeliveryCell = ({ order }: { order: OrderType }) => {
+  if (!order.deliveryMethod) return <span className="text-gray-400">-</span>;
+
+  if (order.deliveryMethod === "pickup") {
+    return (
+      <div className="flex flex-col">
+        <span className="text-gray-700">Pickup</span>
+        <span className="text-xs text-gray-400">Free</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <span className="text-gray-700">Delivery</span>
+      <span className="text-xs text-gray-400">
+        {order.shipping?.city}
+        {order.deliveryFee
+          ? ` · ${formatAmount(order.deliveryFee, order.currency)}`
+          : ""}
+      </span>
+    </div>
+  );
+};
+
 const formatAmount = (amount: number, currency?: string | null) =>
   `${currency || "UGX"} ${amount.toLocaleString("en-UG")}`;
 
@@ -252,7 +277,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 text-left">
@@ -263,6 +288,9 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
                   Products
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                  Delivery
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
                   Payment Method
@@ -303,6 +331,9 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                             remaining > 0 ? ` +${remaining} more` : ""
                           }`
                         : "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <DeliveryCell order={order} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                       <PaymentMethodBadge

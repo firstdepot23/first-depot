@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { OrderType } from "@repo/types";
 import AutoRefresh from "../components/AutoRefresh";
+import CartReconcile from "../components/CartReconcile";
 import OrdersTable from "../components/OrdersTable";
 import RetryButton from "../components/RetryButton";
 
@@ -119,6 +120,8 @@ const OrdersPage = async () => {
         </p>
       ) : (
         <>
+          {/* Landing here after paying: make sure paid items leave the cart. */}
+          <CartReconcile />
           {hasPending && (
             <>
               <p className="mb-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700">

@@ -21,14 +21,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Needed so the link-preview image (opengraph-image / twitter-image) gets a full URL.
+  // Set NEXT_PUBLIC_SITE_URL to your real domain, e.g. https://firstdepot.com
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3004",
+  ),
   title: "FIRST DEPOT",
   description: "Building comfort for your home",
+  // Points to public/site.webmanifest (home-screen icons for Android / installed web app)
+  manifest: "/site.webmanifest",
 };
 
 // Makes phones render at their real width instead of a zoomed-out desktop page.
+// themeColor lives here (not in metadata) in current Next.js versions.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#c3e1d6",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

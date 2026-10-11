@@ -1,0 +1,124 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600&display=swap");
+
+.fd-colors {
+  --fd-bg: #f7f5f2;
+  --fd-card: #fff;
+  --fd-ink: #1a1a18;
+  --fd-muted: #6b6b66;
+  --fd-faint: #9a9a94;
+  --fd-accent: #c8102e;
+  --fd-border: rgba(0, 0, 0, 0.09);
+  min-height: 100vh;
+  background: var(--fd-bg);
+  color: var(--fd-ink);
+  font-family: "DM Sans", sans-serif;
+}
+.fd-colors * { box-sizing: border-box; }
+.fd-colors button, .fd-colors a { font: inherit; }
+.fd-colors-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 0 2rem;
+  background: var(--fd-card);
+  border-bottom: 1px solid var(--fd-border);
+}
+.fd-colors-header-inner {
+  max-width: 1200px;
+  min-height: 68px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.fd-colors-logo {
+  color: var(--fd-ink);
+  text-decoration: none;
+  font-family: "Playfair Display", serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.fd-colors-logo span { color: var(--fd-accent); }
+.fd-colors-tagline {
+  color: var(--fd-muted);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.fd-colors-hero { background: var(--fd-ink); color: #fff; padding: 3.4rem 2rem 2.7rem; }
+.fd-colors-hero-inner { max-width: 1200px; margin: 0 auto; }
+.fd-colors-eyebrow, .fd-colors-kicker {
+  margin: 0 0 .7rem;
+  color: var(--fd-accent);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.fd-colors-hero h1 {
+  margin: 0 0 .8rem;
+  font-family: "Playfair Display", serif;
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+.fd-colors-intro { max-width: 510px; margin: 0; color: rgba(255,255,255,.68); font-size: .92rem; line-height: 1.7; }
+.fd-colors-accent-bar { display: flex; gap: 4px; max-width: 320px; height: 4px; margin-top: 1.6rem; }
+.fd-colors-accent-bar span { flex: 1; border-radius: 4px; }
+.fd-colors-tabs { position: sticky; top: 68px; z-index: 10; overflow-x: auto; background: #fff; border-bottom: 1px solid var(--fd-border); scrollbar-width: none; }
+.fd-colors-tabs::-webkit-scrollbar { display: none; }
+.fd-colors-tabs-inner { display: flex; width: max-content; min-width: 100%; max-width: 1200px; margin: 0 auto; }
+.fd-colors-tab {
+  display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0;
+  padding: 1.1rem 1.15rem; border: 0; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--fd-faint); cursor: pointer;
+  font-size: .77rem !important; font-weight: 600 !important; letter-spacing: .045em;
+  text-transform: uppercase; transition: color .18s, border-color .18s;
+}
+.fd-colors-tab:hover { color: var(--fd-ink); }
+.fd-colors-tab.is-active { color: var(--fd-ink); border-bottom-color: var(--fd-accent); }
+.fd-colors-tab-dot { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; }
+.fd-colors-main { max-width: 1200px; margin: 0 auto; padding: 2.4rem 2rem 0; }
+.fd-colors-section-header { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding-bottom: 1.2rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--fd-border); }
+.fd-colors-kicker { margin-bottom: .35rem; color: var(--fd-muted); }
+.fd-colors-section-header h2 { margin: 0; font-family: "Playfair Display", serif; font-size: 1.75rem; font-weight: 400; letter-spacing: -.02em; }
+.fd-colors-count { padding-bottom: .2rem; color: var(--fd-muted); font-size: .75rem; letter-spacing: .07em; text-transform: uppercase; }
+.fd-colors-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+.fd-colors-card {
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+  text-align: left; background: var(--fd-card); border: 1px solid var(--fd-border);
+  border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.045);
+  cursor: pointer; transition: transform .18s ease, box-shadow .18s ease;
+}
+.fd-colors-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+.fd-colors-card:focus-visible, .fd-colors-tab:focus-visible { outline: 2px solid var(--fd-accent); outline-offset: 3px; }
+.fd-colors-swatch { display: block; width: 100%; aspect-ratio: 4 / 3; }
+.fd-colors-info { display: flex; flex-direction: column; align-items: flex-start; padding: .75rem .8rem .8rem; gap: .25rem; }
+.fd-colors-code { color: var(--fd-faint); font-size: .67rem; letter-spacing: .06em; }
+.fd-colors-name { color: var(--fd-ink); font-size: .78rem; font-weight: 600; line-height: 1.4; letter-spacing: .025em; text-transform: uppercase; }
+.fd-colors-hex { margin-top: .2rem; color: var(--fd-muted); font-size: .7rem; }
+.fd-colors-disclaimer { display: flex; gap: .8rem; margin-top: 2.8rem; padding: 1.15rem 1.25rem; background: #fff; border: 1px solid var(--fd-border); border-radius: 9px; }
+.fd-colors-disclaimer strong { flex-shrink: 0; font-size: .76rem; }
+.fd-colors-disclaimer p { margin: 0; color: var(--fd-muted); font-size: .76rem; line-height: 1.65; }
+.fd-colors-footer { margin-top: 4rem; padding: 1.5rem 2rem; border-top: 1px solid var(--fd-border); }
+.fd-colors-footer-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem; }
+.fd-colors-footer p { margin: 0; color: var(--fd-muted); font-size: .78rem; }
+.fd-colors-pill { padding: .35rem .7rem; border-radius: 30px; background: var(--fd-accent); color: #fff; font-size: .67rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+@media (max-width: 600px) {
+  .fd-colors-header { padding: 0 1rem; }
+  .fd-colors-header-inner { min-height: 60px; }
+  .fd-colors-tagline { display: none; }
+  .fd-colors-hero { padding: 2.4rem 1rem 2rem; }
+  .fd-colors-tabs { top: 60px; }
+  .fd-colors-tab { padding: 1rem .9rem; font-size: .7rem !important; }
+  .fd-colors-main { padding: 1.6rem 1rem 0; }
+  .fd-colors-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; }
+  .fd-colors-section-header h2 { font-size: 1.45rem; }
+  .fd-colors-disclaimer { flex-direction: column; gap: .4rem; }
+  .fd-colors-footer { padding: 1.25rem 1rem; }
+}
+@media (max-width: 380px) { .fd-colors-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

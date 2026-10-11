@@ -7,6 +7,7 @@ import webhookRoute from "./routes/webhooks.route.js";
 import mobileMoneyRoute from "./routes/mobilemoney.route.js";
 import bankCardRoute from "./routes/bankcard.route.js";
 import paymentsRoute from "./routes/payments.route.js";
+import checkoutRoute from "./routes/checkout.route.js";
 
 const app = new Hono();
 
@@ -19,6 +20,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3004")
 // CORS first, so browser preflight (OPTIONS) requests are answered.
 // Sign-in is checked per route by shouldBeUser (middleware/authMiddleware.ts),
 // not globally, so /health and the Pesapal webhook never depend on Clerk.
+// (PUT is allowed by hono's cors() defaults, which /checkout/details needs.)
 app.use("*", cors({ origin: allowedOrigins }));
 
 app.get("/health", (c) => {
@@ -33,6 +35,7 @@ app.route("/webhooks", webhookRoute);
 app.route("/mobile-money", mobileMoneyRoute);
 app.route("/bank-card", bankCardRoute);
 app.route("/payments", paymentsRoute);
+app.route("/checkout", checkoutRoute);
 
 const port = Number(process.env.PORT) || 8002;
 
