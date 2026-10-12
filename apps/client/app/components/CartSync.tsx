@@ -4,8 +4,8 @@ import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef } from "react";
 import useCartStore from "../stores/storeCart";
 import useCheckoutStore from "../stores/storeCheckout";
-import { fetchServerCart, saveServerCart } from "../lib/cartApi";
-import { ackCartCleared, fetchPaidOrders } from "../lib/paymentApi";
+import { fetchServerCart, saveServerCart } from "../api/svc/cart/cartApi";
+import { ackCartCleared, fetchPaidOrders } from "../api/svc/payment/paymentApi";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -74,7 +74,9 @@ const CartSync = () => {
       const current = useCartStore.getState().cart;
       const remaining = current.filter(
         (item) =>
-          !paidKeys.has(lineKey(item.id, item.selectedSize, item.selectedColor)),
+          !paidKeys.has(
+            lineKey(item.id, item.selectedSize, item.selectedColor),
+          ),
       );
 
       if (remaining.length !== current.length) {

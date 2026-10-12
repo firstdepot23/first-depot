@@ -18,7 +18,7 @@ import {
   fetchCheckoutDetails,
   saveCheckoutDetails,
   toShippingForm,
-} from "../lib/paymentApi";
+} from "../api/svc/payment/paymentApi";
 import { formatUGX } from "../lib/checkout";
 import { startLoader } from "./NavigationProgress";
 
