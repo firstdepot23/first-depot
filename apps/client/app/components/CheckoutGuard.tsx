@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import useCartStore from "../stores/storeCart";
 import useCheckoutStore from "../stores/storeCheckout";
-import { fetchCheckoutDetails, toShippingForm } from "../lib/paymentApi";
+import {
+  fetchCheckoutDetails,
+  toShippingForm,
+} from "../api/svc/payment/paymentApi";
 import { startLoader } from "./NavigationProgress";
 
 // Each step is its own page, so someone can land on /cart/shipping or

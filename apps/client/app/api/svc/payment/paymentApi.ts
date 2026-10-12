@@ -4,7 +4,9 @@ import type {
   ShippingFormInputs,
 } from "@repo/types";
 
-const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL;
+// Goes through this site's own server (app/api/svc/[service]/[...path]) rather
+// than straight to the payment service's *.onrender.com address.
+const PAYMENT_API = "/api/svc/payment";
 
 // The payment service sleeps on Render's free tier too, so allow a slow start.
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -14,11 +16,7 @@ const request = async <T>(
   token: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<T> => {
-  if (!PAYMENT_SERVICE_URL) {
-    throw new Error("NEXT_PUBLIC_PAYMENT_SERVICE_URL is not set");
-  }
-
-  const res = await fetch(`${PAYMENT_SERVICE_URL}${path}`, {
+  const res = await fetch(`${PAYMENT_API}${path}`, {
     method: init.method ?? "GET",
     headers: {
       Authorization: `Bearer ${token}`,

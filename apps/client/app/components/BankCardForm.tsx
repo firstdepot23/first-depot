@@ -6,7 +6,10 @@ import useCartStore from "../stores/storeCart";
 
 type Status = "idle" | "loading" | "ready" | "failed";
 
-const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL;
+// Goes through this site's own server (app/api/svc/[service]/[...path]) rather
+// than straight to the payment service's *.onrender.com address, so it works
+// for visitors whose network can't resolve that hostname.
+const PAYMENT_API = "/api/svc/payment";
 
 // Card details are entered on Pesapal's secure hosted page inside the iframe
 // below - this component never sees or sends a card number or CVV.
@@ -19,17 +22,12 @@ const BankCardForm = () => {
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
 
   const handleStart = async () => {
-    if (!PAYMENT_SERVICE_URL) {
-      setError("Payment service is not configured. Please try again later.");
-      return;
-    }
-
     setError(null);
     setStatus("loading");
 
     try {
       const token = await getToken();
-      const res = await fetch(`${PAYMENT_SERVICE_URL}/bank-card/initiate`, {
+      const res = await fetch(`${PAYMENT_API}/bank-card/initiate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,5 +87,4 @@ const BankCardForm = () => {
     </div>
   );
 };
-
 export default BankCardForm;

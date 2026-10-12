@@ -1,6 +1,9 @@
 import { CartItemsType } from "@repo/types";
 
-const CART_SERVICE_URL = process.env.NEXT_PUBLIC_CART_SERVICE_URL;
+// Goes through this site's own server (app/api/svc/[service]/[...path]) rather
+// than straight to the cart service's *.onrender.com address, so it works for
+// visitors whose network can't resolve that hostname.
+const CART_URL = "/api/svc/cart/cart";
 
 // The cart service (and the product service behind it) sleep on Render's free
 // tier, so the first request after a quiet period can take a minute. Give it
@@ -18,17 +21,13 @@ const isRetryableStatus = (status: number) =>
 export const fetchServerCart = async (
   token: string,
 ): Promise<CartItemsType> => {
-  if (!CART_SERVICE_URL) {
-    throw new Error("NEXT_PUBLIC_CART_SERVICE_URL is not set");
-  }
-
   let lastError: Error = new Error("Failed to fetch cart");
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res: Response | null = null;
 
     try {
-      res = await fetch(`${CART_SERVICE_URL}/cart`, {
+      res = await fetch(CART_URL, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -59,11 +58,7 @@ export const saveServerCart = async (
   token: string,
   cart: CartItemsType,
 ): Promise<void> => {
-  if (!CART_SERVICE_URL) {
-    throw new Error("NEXT_PUBLIC_CART_SERVICE_URL is not set");
-  }
-
-  const res = await fetch(`${CART_SERVICE_URL}/cart`, {
+  const res = await fetch(CART_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
