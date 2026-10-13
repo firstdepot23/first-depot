@@ -20,7 +20,30 @@ export const OrderStatus = ["success", "failed", "pending"] as const;
 
 export const DeliveryMethods = ["pickup", "delivery"] as const;
 
-// NOTE: no schema `default`s on paymentStatus/status on purpose. Mongoose
+// Where the parcel is, set by the admin app:
+//   processing -> shipped -> at_station -> delivered
+// For pickup orders "at_station" means "ready for pickup" and "delivered"
+// means "collected". Old orders don't have this field; the admin app shows
+// a missing value as "processing".
+export const ShippingStatus = [
+  "processing",
+  "shipped",
+  "at_station",
+  "delivered",
+] as const;
+export type ShippingStatusType = (typeof ShippingStatus)[number];
+
+// One entry per change, so the order page can show when each step happened.
+const ShippingHistorySchema = new Schema(
+  {
+    status: { type: String, required: true, enum: ShippingStatus },
+    changedAt: { type: Date, required: true },
+    changedBy: { type: String }, // Clerk user id of the admin
+  },
+  { _id: false },
+);
+
+// NOTE: no schema `default`s on paymentStatus/status/shippingStatus on purpose. Mongoose
 // applies defaults to old documents when it loads them, which would make every
 // old successful order look "PENDING". The payment service sets them explicitly.
 const OrderSchema = new Schema(
@@ -75,6 +98,16 @@ const OrderSchema = new Schema(
 
     // Legacy mirror of paymentStatus (see note above).
     status: { type: String, required: true, enum: OrderStatus },
+
+    // --- Shipping progress (changed by the admin) ---
+    shippingStatus: { type: String, enum: ShippingStatus },
+    shippingUpdatedAt: { type: Date },
+    shippingHistory: { type: [ShippingHistorySchema] },
+
+    // Set when a payment was still PENDING after its 5 minute session and we
+    // marked it FAILED ("cancelled or timed out"). Removed again if Pesapal
+    // later reports a real result (e.g. a payment that finished late).
+    expiredAt: { type: Date },
 
     // true once the "order.created" confirmation email event was published.
     confirmationSent: { type: Boolean },

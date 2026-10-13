@@ -5,6 +5,8 @@ export {
   PaymentStatus,
   type PaymentStatusType,
   DeliveryMethods,
+  ShippingStatus,
+  type ShippingStatusType,
 } from "./order-model";
 export { CheckoutDetails } from "./checkout-model";
 

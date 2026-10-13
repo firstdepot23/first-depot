@@ -8,7 +8,11 @@ import {
   Smartphone,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { isStalePending } from "../lib/order";
+import ShippingBadge from "../orders/ShippingBadge";
 
 type SortKey = "date" | "amount";
 type SortDirection = "asc" | "desc";
@@ -30,8 +34,14 @@ const STATUS_STYLES: Record<DisplayStatus, string> = {
   REVERSED: "bg-gray-100 text-gray-700",
 };
 
-const getDisplayStatus = (order: OrderType): DisplayStatus => {
+const getDisplayStatus = (order: OrderType, now: number): DisplayStatus => {
   const status = String(order.paymentStatus ?? "").toUpperCase();
+
+  // Still "pending" after its 5 minute payment session? Then it was cancelled
+  // or timed out: show it as failed instead of waiting forever. (The server
+  // saves this too; this covers the moments before it has.)
+  if (status === "PENDING" && isStalePending(order, now)) return "FAILED";
+
   if (
     status === "COMPLETED" ||
     status === "PENDING" ||
@@ -46,6 +56,12 @@ const getDisplayStatus = (order: OrderType): DisplayStatus => {
   if (order.status === "failed") return "FAILED";
   return "PENDING";
 };
+
+// A payment that ended without being paid (session cancelled or timed out),
+// as opposed to one the bank / mobile money provider declined.
+const wasNotCompleted = (order: OrderType, now: number) =>
+  isStalePending(order, now) ||
+  (order.paymentStatus === "FAILED" && Boolean(order.expiredAt));
 
 const StatusBadge = ({ status }: { status: DisplayStatus }) => (
   <span
@@ -125,7 +141,10 @@ const formatDate = (date: string | Date | undefined) =>
       })
     : "-";
 
-const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
+// `now` comes from the server render, so the first render on the client is
+// identical to the server's (no hydration mismatch at the 5 minute mark).
+const OrdersTable = ({ orders, now }: { orders: OrderType[]; now: number }) => {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [methodFilter, setMethodFilter] = useState<string>("all");
@@ -133,9 +152,9 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const statusOptions = useMemo(() => {
-    const seen = new Set<string>(orders.map(getDisplayStatus));
+    const seen = new Set<string>(orders.map((o) => getDisplayStatus(o, now)));
     return ["all", ...Array.from(seen)];
-  }, [orders]);
+  }, [orders, now]);
 
   const methodOptions = useMemo(() => {
     const seen = new Set(orders.map((o) => o.paymentMethod).filter(Boolean));
@@ -147,7 +166,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
 
     const filtered = orders.filter((order) => {
       const matchesStatus =
-        statusFilter === "all" || getDisplayStatus(order) === statusFilter;
+        statusFilter === "all" || getDisplayStatus(order, now) === statusFilter;
       const matchesMethod =
         methodFilter === "all" || order.paymentMethod === methodFilter;
 
@@ -186,7 +205,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
     });
 
     return sorted;
-  }, [orders, search, statusFilter, methodFilter, sortKey, sortDirection]);
+  }, [orders, now, search, statusFilter, methodFilter, sortKey, sortDirection]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -277,7 +296,7 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[1040px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 text-left">
@@ -301,6 +320,9 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
                   Status
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                  Tracking
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -312,13 +334,23 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                 return (
                   <tr
                     key={order._id}
-                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                    className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                    onClick={(event) => {
+                      // Links handle their own click.
+                      if ((event.target as HTMLElement).closest("a")) return;
+                      router.push(`/orders/${order._id}`);
+                    }}
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">
                       {formatDate(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                      <div>{order._id.slice(-8)}</div>
+                      <Link
+                        href={`/orders/${order._id}`}
+                        className="text-gray-700 underline-offset-2 hover:underline"
+                      >
+                        {order._id.slice(-8)}
+                      </Link>
                       {order.confirmationCode && (
                         <div className="text-gray-400">
                           {order.confirmationCode}
@@ -345,7 +377,16 @@ const OrdersTable = ({ orders }: { orders: OrderType[] }) => {
                       {formatAmount(order.amount, order.currency)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={getDisplayStatus(order)} />
+                      <StatusBadge status={getDisplayStatus(order, now)} />
+                      {wasNotCompleted(order, now) && (
+                        <p className="mt-1 max-w-[11rem] text-xs text-gray-400">
+                          Payment not completed: the session was cancelled or
+                          timed out.
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <ShippingBadge order={order} />
                     </td>
                   </tr>
                 );

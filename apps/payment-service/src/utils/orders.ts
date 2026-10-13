@@ -68,6 +68,11 @@ const CAN_REPLACE: Record<PaymentStatusType, PaymentStatusType[] | null> = {
   PENDING: ["PENDING"],
 };
 
+// How long a customer has to pay. Pesapal's checkout session lasts about 5
+// minutes; after that a payment that is still PENDING was cancelled or timed
+// out. KEEP IN SYNC with PAYMENT_WINDOW_MS in apps/client/app/lib/orders.ts.
+export const PAYMENT_WINDOW_MS = 5 * 60 * 1000;
+
 export type OrderDraft = {
   userId: string;
   email: string;
@@ -174,7 +179,13 @@ export const syncOrderWithPesapal = async (
   const allowed = CAN_REPLACE[paymentStatus];
   const updated = await Order.findOneAndUpdate(
     allowed ? { ...identity, paymentStatus: { $in: allowed } } : identity,
-    { $set: update },
+    {
+      $set: update,
+      // A real Pesapal result (completed, failed, reversed) replaces our own
+      // "session expired" verdict. This is what lets a payment that finished
+      // a little late still become COMPLETED.
+      ...(paymentStatus !== "PENDING" && { $unset: { expiredAt: "" } }),
+    },
     { new: true },
   );
 
@@ -289,6 +300,33 @@ export const checkPaymentStatus = async (userId: string, reference: string) => {
     console.error("status sync failed, returning stored status:", error);
     return toStatusResponse(existing);
   }
+};
+
+/**
+ * Marks this customer's payments that are STILL pending after the payment
+ * window as FAILED (cancelled or timed out). Call it AFTER asking Pesapal for
+ * the latest status, so a payment that just went through is not expired.
+ * If Pesapal reports it completed later, it is upgraded to COMPLETED again.
+ * Returns how many orders were expired.
+ */
+export const expireStalePending = async (userId: string): Promise<number> => {
+  const result = await Order.updateMany(
+    {
+      userId,
+      paymentStatus: "PENDING",
+      createdAt: { $lte: new Date(Date.now() - PAYMENT_WINDOW_MS) },
+    },
+    {
+      $set: {
+        paymentStatus: "FAILED",
+        status: "failed",
+        statusDescription:
+          "Payment was not completed: the payment session was cancelled or timed out.",
+        expiredAt: new Date(),
+      },
+    },
+  );
+  return result.modifiedCount;
 };
 
 // ---------------------------------------------------------------------------
