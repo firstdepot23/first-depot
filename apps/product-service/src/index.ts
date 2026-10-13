@@ -60,8 +60,8 @@ process.on("uncaughtException", (error) => {
   console.error("Uncaught exception:", error);
 });
 
-// Render injects PORT. Locally, set PORT=8000 in .env (or rely on the fallback).
-const port = Number(process.env.PORT) || 8000;
+// Render injects PORT. Locally, set PORT=10000 in .env (or rely on the fallback).
+const port = Number(process.env.PORT) || 10000;
 
 // Listen immediately. This service used to connect to Kafka BEFORE opening
 // its port, so while Kafka was slow (or failing) Render saw no open port and
