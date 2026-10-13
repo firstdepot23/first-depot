@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { Order } from "@repo/order-db";
 import { shouldBeUser } from "../middleware/authMiddleware";
 import {
+  expireStalePending,
   getPaidOrderLines,
   markCartCleared,
   syncOrderWithPesapal,
@@ -11,11 +12,14 @@ const paymentsRoute = new Hono();
 
 // Called by the Orders page. Re-checks every payment of the signed-in user
 // that is still PENDING directly with Pesapal, so an order flips to COMPLETED
-// even if Pesapal's IPN never reached us.
+// even if Pesapal's IPN never reached us. Anything STILL pending after the
+// 5 minute payment window is then marked FAILED (cancelled or timed out), so
+// an abandoned checkout doesn't stay "pending" forever.
 paymentsRoute.post("/sync", shouldBeUser, async (c) => {
   try {
+    const userId = c.get("userId");
     const pending = await Order.find({
-      userId: c.get("userId"),
+      userId,
       paymentStatus: "PENDING",
       orderTrackingId: { $exists: true, $ne: null },
     })
@@ -29,7 +33,11 @@ paymentsRoute.post("/sync", shouldBeUser, async (c) => {
     );
 
     const failed = results.filter((r) => r.status === "rejected").length;
-    return c.json({ checked: pending.length, failed });
+
+    // After the Pesapal check above, never before it.
+    const expired = await expireStalePending(userId);
+
+    return c.json({ checked: pending.length, failed, expired });
   } catch (error) {
     console.error("payments sync failed:", error);
     return c.json({ error: "Sync failed" }, 500);

@@ -4,11 +4,18 @@ import AutoRefresh from "../components/AutoRefresh";
 import CartReconcile from "../components/CartReconcile";
 import OrdersTable from "../components/OrdersTable";
 import RetryButton from "../components/RetryButton";
+import { isActivePending, sessionTimeLeftMs } from "../lib/order";
 
 type FetchResult =
   { ok: true; orders: OrderType[] } | { ok: false; message: string };
 
+// Pending in the database (even if its session is long over). Used to decide
+// whether to ask the payment service to re-check with Pesapal and expire it.
 const isPending = (order: OrderType) => order.paymentStatus === "PENDING";
+
+// Extra time after the last session ends, so the final refresh lands just
+// AFTER it and the page can show the payment as not completed.
+const REFRESH_BUFFER_MS = 10_000;
 
 const requestOrders = async (
   baseUrl: string,
@@ -103,7 +110,18 @@ const fetchOrders = async (): Promise<FetchResult> => {
 
 const OrdersPage = async () => {
   const result = await fetchOrders();
-  const hasPending = result.ok && result.orders.some(isPending);
+  const now = Date.now();
+
+  // Only payments still INSIDE their 5 minute session are worth waiting for.
+  // Anything older is shown as not completed, and the page stops refreshing.
+  const waiting = result.ok
+    ? result.orders.filter((order) => isActivePending(order, now))
+    : [];
+  const hasPending = waiting.length > 0;
+  const watchMs = hasPending
+    ? Math.max(...waiting.map((order) => sessionTimeLeftMs(order, now))) +
+      REFRESH_BUFFER_MS
+    : 0;
 
   return (
     <div className="mx-auto max-w-5xl py-6 sm:py-8">
@@ -126,12 +144,13 @@ const OrdersPage = async () => {
             <>
               <p className="mb-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700">
                 We&apos;re confirming a payment with Pesapal. This page updates
-                automatically.
+                automatically. If the payment isn&apos;t completed within 5
+                minutes, it will be shown as not completed.
               </p>
-              <AutoRefresh />
+              <AutoRefresh maxMs={watchMs} />
             </>
           )}
-          <OrdersTable orders={result.orders} />
+          <OrdersTable orders={result.orders} now={now} />
         </>
       )}
     </div>
