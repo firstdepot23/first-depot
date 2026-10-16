@@ -1,0 +1,30 @@
+name: Keep services warm
+
+# Runs on GitHub's servers, so it keeps going without any machine of yours.
+# GitHub's smallest reliable gap is about 5 minutes and runs can start a few
+# minutes late, which is fine for a 10 minute ping.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {} # lets you run it by hand from the Actions tab
+
+permissions: {}
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/keep-warm.mjs --once
+        env:
+          KEEP_WARM_ALERT_WEBHOOK: ${{ secrets.KEEP_WARM_ALERT_WEBHOOK }}
