@@ -13,7 +13,7 @@ const Navbar = () => {
       {/* LEFT - logo */}
       <Link href="/" className="flex shrink-0 items-center" aria-label="Home">
         <Image
-          src="/logo.png"
+          src="/icons/logo.png"
           alt="FIRST-DEPOT"
           width={46}
           height={46}
