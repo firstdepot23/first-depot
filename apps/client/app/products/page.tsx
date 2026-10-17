@@ -1,5 +1,13 @@
 import ProductList from "../components/ProductList";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "/products",
+  },
+};
+
 const ProductsPage = async ({
   searchParams,
 }: {
