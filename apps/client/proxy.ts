@@ -15,8 +15,10 @@ export default clerkMiddleware();
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and static files, run for everything else
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Skip Next.js internals and static files, run for everything else.
+    // txt / xml / gz keep robots.txt, sitemap.xml and sitemap.xml.gz out of
+    // the sign-in middleware, so search engines always get them as plain files.
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|txt|xml|gz)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",
   ],
