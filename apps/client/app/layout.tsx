@@ -23,22 +23,34 @@ const geistMono = Geist_Mono({
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://first-depot.com";
 
+// The page title shown in the browser tab, in Chrome's address-bar
+// suggestions for people who have visited, and as the headline of the search
+// result. Keep it under ~60 characters so Google doesn't cut it off.
+const SITE_TITLE = "First Depot";
+
+// Shown under the title in search results (Google shows about 155 characters).
 const DESCRIPTION =
-  "First Depot Hardwares Limited is a home improvement company in Lira, Uganda. Paints, electricals, pumps and plumbing, tiles and building materials, delivered to where the work is happening.";
+  "First Depot Hardwares Limited is a Ugandan hardware and home improvement company. We supply paints, pumps and plumbing, tiles, home essentials, accessories and building materials to homeowners, builders and businesses.";
 
 export const metadata: Metadata = {
   // Needed so relative image URLs become full URLs.
   metadataBase: new URL(SITE_URL),
-  // What Google shows as the page title: "First Depot | Home Improvement Company".
+  // Pages that set their own title become "<their title> | First Depot".
+  // The homepage (and any page without a title) uses SITE_TITLE.
   title: {
-    default: "First Depot | Home Improvement Company",
+    default: SITE_TITLE,
     template: "%s | First Depot",
   },
   // What Google shows under the title in search results.
   description: DESCRIPTION,
   applicationName: "First Depot",
+  // Google ignores this tag; it is kept only for other search engines.
   keywords: [
     "First Depot",
+    "FirstDepot",
+    "First Depot Uganda",
+    "First Depot Lira",
+    "hardware and home improvement company",
     "home improvement company",
     "hardware store Lira",
     "hardware Uganda",
@@ -52,7 +64,10 @@ export const metadata: Metadata = {
   creator: "First Depot Hardwares Limited",
   publisher: "First Depot Hardwares Limited",
   category: "Home improvement",
-  alternates: { canonical: "/" },
+  // NO `alternates.canonical` here on purpose. Set in the root layout it is
+  // inherited by EVERY page that doesn't set its own, so every product and
+  // docs page would tell Google "I am a copy of the homepage" and drop out of
+  // search. Each page sets its own (see app/page.tsx).
   // Points to public/site.webmanifest (home-screen icons for Android / installed web app)
   manifest: "/site.webmanifest",
   // Tab icon and the logo Google shows beside your result.
@@ -76,7 +91,7 @@ export const metadata: Metadata = {
     siteName: "First Depot",
     locale: "en_UG",
     url: SITE_URL,
-    title: "First Depot | Home Improvement Company",
+    title: SITE_TITLE,
     description: DESCRIPTION,
     images: [
       {
@@ -89,7 +104,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "First Depot | Home Improvement Company",
+    title: SITE_TITLE,
     description: DESCRIPTION,
     images: ["/icons/og-image-2x.png"],
   },
