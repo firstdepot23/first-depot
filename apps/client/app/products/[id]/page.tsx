@@ -26,6 +26,9 @@ export const generateMetadata = async ({
   return {
     title: `${product.name} | FIRST DEPOT`,
     description: product.shortDescription || product.description,
+    alternates: {
+      canonical: `/products/${id}`,
+    },
     openGraph: cover ? { images: [cover] } : undefined,
   };
 };

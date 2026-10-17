@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Blog | FIRST DEPOT",
   description:
     "Guides, project ideas and product news to help you build comfort for your home.",
+  alternates: {
+    canonical: "/blog",
+  },
 };
 
 const Chevron = () => (
