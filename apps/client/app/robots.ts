@@ -10,7 +10,8 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         // Private pages that should never appear in search.
-        disallow: ["/cart", "/api/"],
+        // /cart also covers /cart/shipping and /cart/payment.
+        disallow: ["/cart", "/orders", "/payment/", "/api/"],
       },
     ],
     sitemap: `${SITE}/sitemap.xml`,

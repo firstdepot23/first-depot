@@ -39,7 +39,7 @@ export const company = {
   phoneHref: "+256781905753",
   whatsapp: "+256 777433635",
   whatsappHref: "https://wa.me/256777433635",
-  address: "Plot 00, Ojwina Road - Wigweng, Barogole, Lira City West, Lira City, Uganda",
+  address: "Ojwina Road - Wigweng, Barogole, Lira City West, Lira City, Uganda",
   postaladdress: "P. O. Box 332500, LIRA",
   hours: {
     weekdays: "Monday to Saturday, 8:00 am to 6:00 pm",
