@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { CloseLink } from "./_components/CloseLink";
 import { Address } from "./_components/Address";
-import { company } from "./_data/company";
-import { docs, groupOrder, SHOW_ADDRESS } from "./_data";
+import { inc } from "./_data/company";
+import { docs, groupOrder } from "./_data";
 
 export default function DocsIndexPage() {
   return (
@@ -11,12 +11,14 @@ export default function DocsIndexPage() {
 
       <div className="fd-docs-intro">
         <p>
-          Everything you need to know about shopping with, working with and
-          building on {company.legalName}: our policies, how to get help, and
-          what we stock.
+          Welcome to {inc.legalName}, {inc.description} and the parent of the
+          First Depot group. Here you will find our policies, how to get help,
+          and what our businesses stock.
         </p>
         <p>
-          {company.tagline}. If you can not find what you are looking for,{" "}
+          {inc.tagline}. To see the shops and products we run, visit{" "}
+          <Link href="/docs/businesses">Our Businesses</Link>. If you can not
+          find what you are looking for,{" "}
           <Link href="/docs/contacts">get in touch</Link>.
         </p>
       </div>
@@ -39,7 +41,7 @@ export default function DocsIndexPage() {
         );
       })}
 
-      <Address />
+      <Address of="inc" />
     </>
   );
 }

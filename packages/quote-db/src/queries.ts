@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { connectQuoteDB } from "./connection";
-import { Quote, type QuoteEmailStatus, type QuotePlain } from "./quote-model";
+import {
+  Quote,
+  QuoteStatuses,
+  type QuoteEmailStatus,
+  type QuotePlain,
+  type QuoteStatus,
+} from "./quote-model";
 
 export type NewQuote = Omit<
   QuotePlain,
@@ -44,4 +50,26 @@ export const markQuoteEmail = async (
 export const getQuotes = async (limit = 100): Promise<QuotePlain[]> => {
   await connectQuoteDB();
   return Quote.find().sort({ createdAt: -1 }).limit(limit).lean<QuotePlain[]>();
+};
+
+export const getQuoteByReference = async (
+  reference: string,
+): Promise<QuotePlain | null> => {
+  await connectQuoteDB();
+  return Quote.findOne({ reference }).lean<QuotePlain>();
+};
+
+// Quote requests nobody has dealt with yet (shown on the admin Inbox badge).
+export const countNewQuotes = async (): Promise<number> => {
+  await connectQuoteDB();
+  return Quote.countDocuments({ status: "new" });
+};
+
+export const setQuoteStatus = async (
+  reference: string,
+  status: QuoteStatus,
+): Promise<void> => {
+  if (!QuoteStatuses.includes(status)) throw new Error("Invalid quote status");
+  await connectQuoteDB();
+  await Quote.updateOne({ reference }, { status });
 };

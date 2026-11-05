@@ -5,8 +5,10 @@ import { useState } from "react";
 import { CreditCard, Smartphone } from "lucide-react";
 import MobileMoneyForm from "./MobileMoneyForm";
 import BankCardForm from "./BankCardForm";
-import useCartStore from "../stores/storeCart";
 import useCheckoutStore from "../stores/storeCheckout";
+import { SEGMENT_META } from "../data/segments";
+import { blockedFor } from "../lib/productChoices";
+import { subtotalOf, useCheckoutCart } from "../lib/segmentCart";
 
 type PaymentMethod = "mobile_money" | "bank_card";
 
@@ -36,14 +38,19 @@ const OPTIONS: {
 // pay" matches what is charged.
 const PaymentMethodSelector = () => {
   const [method, setMethod] = useState<PaymentMethod | null>(null);
-  const cart = useCartStore((state) => state.cart);
+  // The cart being paid for. Delivery details are shared by every cart;
+  // each cart is its own order (and its own delivery fee).
+  const { segment, items } = useCheckoutCart();
+  const label = SEGMENT_META[segment].label;
+  // Prescription-only / out of stock (judged on the pack in the cart; fast food
+  // is made to order, so never) / expired lines can't be paid for.
+  const hasBlocked = items.some(
+    (item) => blockedFor(item, item.selectedSize) !== null,
+  );
   const deliveryMethod = useCheckoutStore((state) => state.deliveryMethod);
   const deliveryCity = useCheckoutStore((state) => state.deliveryCity);
 
-  const subtotal = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
+  const subtotal = subtotalOf(items);
   const deliveryFee = getDeliveryFee(deliveryMethod, deliveryCity);
   const total = subtotal + deliveryFee;
 
@@ -53,9 +60,26 @@ const PaymentMethodSelector = () => {
     return <BankCardForm />;
   };
 
+  // Same check as the cart page, repeated here in case someone opens the
+  // payment step directly.
+  if (hasBlocked) {
+    return (
+      <div
+        role="alert"
+        className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+      >
+        Some items in your {label.toLowerCase()} cart can&rsquo;t be ordered
+        online. Go back to your cart and remove them to pay.
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-2 rounded-md bg-gray-50 px-3 py-3 sm:px-4">
+        <p className="text-xs font-medium text-gray-500">
+          Paying for your {label.toLowerCase()} cart
+        </p>
         <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
           <span>Subtotal</span>
           <span>UGX {subtotal.toLocaleString()}</span>

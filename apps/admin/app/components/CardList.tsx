@@ -88,17 +88,25 @@ const CardList = async ({ title }: { title: string }) => {
                 key={item.id}
                 className="flex-row items-center justify-between gap-4 p-4"
               >
-                <div className="w-12 h-12 rounded-sm relative overflow-hidden">
-                  <Image
-                    src={
-                      Object.values(item.images as Record<string, string>)[0] ||
-                      ""
-                    }
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                  />
+                <div className="w-12 h-12 rounded-sm relative overflow-hidden bg-muted">
+                  {/* Bulk-added grocery/pharmacy products can have no photo yet. */}
+                  {(() => {
+                    const imageSrc = Object.values(
+                      (item.images ?? {}) as Record<string, string>,
+                    ).find((src) => typeof src === "string" && src.length > 0);
+
+                    return imageSrc ? (
+                      <Image
+                        src={imageSrc}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                        sizes="48px"
+                      />
+                    ) : null;
+                  })()}
                 </div>
+
                 <CardContent className="flex-1 p-0">
                   <CardTitle className="text-sm font-medium">
                     {item.name}
@@ -118,7 +126,7 @@ const CardList = async ({ title }: { title: string }) => {
                   </CardTitle>
                   <Badge variant="secondary">{item.status}</Badge>
                 </CardContent>
-                <CardFooter className="p-0">${item.amount / 100}</CardFooter>
+                <CardFooter className="p-0">UGX {item.amount}</CardFooter>
               </Card>
             ))}
       </div>

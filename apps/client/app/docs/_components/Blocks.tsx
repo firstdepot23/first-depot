@@ -75,6 +75,31 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
                 <Inline text={block.text} />
               </p>
             );
+          case "products":
+            return (
+              <div className="fd-docs-products" key={i}>
+                {block.items.map((item) => (
+                  <figure className="fd-docs-product" key={item.name}>
+                    {/* Plain <img> on purpose: product images can come from
+                        any host, so no next/image remotePatterns are needed. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      width={600}
+                      height={400}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <figcaption>
+                      <strong>{item.name}</strong>
+                      {item.blurb ? <span>{item.blurb}</span> : null}
+                      {item.price ? <b>{item.price}</b> : null}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            );
         }
       })}
     </>

@@ -8,7 +8,7 @@ import { useAuth } from "@clerk/nextjs";
 import { toast } from "react-toastify";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { ProductType } from "@repo/types";
+import { SEGMENT_LABELS, type ProductType } from "@repo/types";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
 import {
@@ -168,6 +168,22 @@ export const columns: ColumnDef<DataTableFeatures, ProductType>[] = [
     cell: ({ row }) => categorySlugOf(row.original) || "-",
   },
   {
+    id: "segment",
+    header: "Segment",
+    cell: ({ row }) =>
+      SEGMENT_LABELS[row.original.segment] ?? row.original.segment,
+  },
+  {
+    id: "stock",
+    header: "Stock",
+    // Hardware doesn't track stock yet and fast food is made to order, so
+    // don't show a misleading 0.
+    cell: ({ row }) =>
+      row.original.segment === "HARDWARE" || row.original.segment === "FASTFOOD"
+        ? "-"
+        : (row.original.stock ?? 0).toLocaleString(),
+  },
+  {
     accessorKey: "price",
     header: ({ column }) => {
       return (
@@ -180,7 +196,39 @@ export const columns: ColumnDef<DataTableFeatures, ProductType>[] = [
         </Button>
       );
     },
-    cell: ({ row }) => `UGX ${row.original.price.toLocaleString()}`,
+    cell: ({ row }) => {
+      const product = row.original;
+      const packs = product.variants ?? [];
+
+      // Several pack sizes: show the lowest price and how many packs there are.
+      if (packs.length > 1) {
+        const lowest = Math.min(...packs.map((pack) => pack.price));
+        return (
+          <div>
+            <div>From UGX {lowest.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground">
+              {packs.length} pack sizes
+            </div>
+          </div>
+        );
+      }
+
+      // Fast food with accompaniments: the meal's own price, plus a hint.
+      const groups = product.optionGroups ?? [];
+      if (groups.length > 0) {
+        return (
+          <div>
+            <div>UGX {product.price.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground">
+              {groups.length} {groups.length === 1 ? "choice" : "choices"} to
+              pick
+            </div>
+          </div>
+        );
+      }
+
+      return `UGX ${product.price.toLocaleString()}`;
+    },
   },
   {
     accessorKey: "shortDescription",

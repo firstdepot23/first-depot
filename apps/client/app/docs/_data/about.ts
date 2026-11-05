@@ -1,4 +1,4 @@
-import { company as c } from "./company";
+import { company as c, inc } from "./company";
 import { p, ul, type DocPage } from "./schema";
 
 // Deliberately limited to who we are, what we stand for and who we serve.
@@ -13,15 +13,16 @@ export const about: DocPage = {
   updated: "October 2026",
   intro: [
     p(
-      `${c.legalName} is a Ugandan hardware and home improvement company. We supply paints, electricals, pumps and plumbing, tiles and building materials to homeowners, builders and businesses, 
-      and we deliver them to where the work is happening.
-      Home improvement is not only about building materials, construction, repairs, or renovation. 
-      It is also about creating a space that people are proud to call home.
-Therefore we also provide the right accessories, furnishings, finishes, lighting, colors, decor, electricals, electronics and everyday home products that can transform an ordinary house into a warm, beautiful, and comfortable living space. We also provide logistics & supply chain services such as transportation and warehousing as a business to business or business to consumer service as stated in our Company Memorandum & Articles of Association
-      `,
+      `First Depot is a group of companies led by ${inc.legalName}, ${inc.description}. It builds and runs the technology behind three businesses registered in Uganda: ${c.legalName} (hardware and home improvement), OxPharm Health Limited (pharmacy) and MD Clove (groceries).`,
     ),
     p(
-      `We started with a simple idea: buying what you need to improve your home should be easy, fairly priced and free of surprises. And that home improvement goes beyond construction and renovation. It is about providing the "materials, accessories, products, and ideas that help people create spaces where they can live comfortably and enjoy life together`,
+      `${c.legalName} is where we began. It is a Ugandan hardware and home improvement company that supplies paints, electricals, pumps and plumbing, tiles and building materials to homeowners, builders and businesses, and delivers them to where the work is happening. We also provide logistics and supply chain services, such as transportation and warehousing, to businesses and to consumers, as set out in our Memorandum and Articles of Association.`,
+    ),
+    p(
+      `Home improvement is not only about building materials, construction, repairs or renovation. It is also about creating a space that people are proud to call home. So we also provide the accessories, furnishings, finishes, lighting, colours, decor, electricals, electronics and everyday home products that can turn an ordinary house into a warm, beautiful and comfortable living space. Through OxPharm Health and MD Clove, we also supply the health, wellness, food and household essentials that families need every day.`,
+    ),
+    p(
+      `We started with a simple idea: buying what you need to improve your home should be easy, fairly priced and free of surprises, and home improvement goes beyond construction and renovation. It is about providing the materials, accessories, products and ideas that help people create spaces where they can live comfortably and enjoy life together.`,
     ),
   ],
   sections: [
@@ -30,7 +31,7 @@ Therefore we also provide the right accessories, furnishings, finishes, lighting
       title: "Our mission",
       blocks: [
         p(
-          `Our hardware store aims to provide top-notch hardware products, revolutionary strategies and unmatched customer experience.`,
+          `Our group aims to provide top-notch products, revolutionary strategies and unmatched customer experience.`,
         ),
       ],
     },
@@ -39,7 +40,7 @@ Therefore we also provide the right accessories, furnishings, finishes, lighting
       title: "Our vision",
       blocks: [
         p(
-          `Leading Uganda’s transition into a Services driven economy through improvements in infrastructure.`,
+          `Leading Uganda’s transition into a services-driven economy through improvements in infrastructure.`,
         ),
       ],
     },
@@ -63,6 +64,7 @@ Therefore we also provide the right accessories, furnishings, finishes, lighting
           "**Being customer centric.** We listen first, advise honestly and fix mistakes quickly.",
           "**Sustainability.** We choose durable products, reduce packaging waste and look for ways to reuse and recycle.",
           "**Home improvement.** From a single tin of paint to a whole building, we want to make improvement within reach.",
+          "**Technology that serves people.** We build our own software so that ordering, delivery and payment are simple for customers and dependable for the shops.",
         ),
       ],
     },
@@ -72,9 +74,9 @@ Therefore we also provide the right accessories, furnishings, finishes, lighting
       blocks: [
         p(`We work with three kinds of customer:`),
         ul(
-          "**Individuals.** Homeowners, builders, painters and enthusiasts, including woodworkers and weekend project makers.",
+          "**Individuals.** Homeowners, builders, painters and enthusiasts, including woodworkers and weekend project makers, and families shopping for groceries and everyday health products.",
           "**Professionals.** Contractors, maintenance workers and other tradespeople who need dependable supply.",
-          "**Businesses and institutions.** Construction companies, property managers and public bodies working on roads, bridges and public buildings.",
+          "**Businesses and institutions.** Construction companies, property managers and public bodies working on roads, bridges and public buildings, and businesses that run their sales and stock on our software.",
         ),
       ],
     },
@@ -83,7 +85,16 @@ Therefore we also provide the right accessories, furnishings, finishes, lighting
       title: "What we sell",
       blocks: [
         p(
-          `Quality paints and painting materials at affordable prices are where we began, and our range has grown to include electricals, pumps and plumbing, tiles, building materials and general hardware. See the full list on our [Products](/docs/products) page.`,
+          `Quality paints and painting materials at affordable prices are where we began, and our range has grown to include electricals, pumps and plumbing, tiles, building materials and general hardware, plus groceries and pharmacy products. See the full list on our [Products](/docs/products) page.`,
+        ),
+      ],
+    },
+    {
+      id: "group",
+      title: "The First Depot group",
+      blocks: [
+        p(
+          `${inc.legalName} is the parent company. Three companies registered in Uganda run the shops: ${c.legalName}, OxPharm Health Limited and MD Clove. ${inc.legalName} also builds GLS, the software that runs our own sales and stock, which is open to other businesses too. See [Our Businesses](/docs/businesses) for the full picture.`,
         ),
       ],
     },

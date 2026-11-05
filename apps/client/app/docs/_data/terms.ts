@@ -1,4 +1,4 @@
-import { company as c } from "./company";
+import { company as c, inc } from "./company";
 import { p, ul, note, type DocPage } from "./schema";
 
 export const terms: DocPage = {
@@ -7,11 +7,11 @@ export const terms: DocPage = {
   subtitle: "The rules for shopping and working with First Depot",
   blurb: "the rules for using our store",
   group: "Policies",
-  updated: "October 2026",
+  updated: "OCTOBER, 2026",
   numbered: true,
   intro: [
     p(
-      `These terms are a plain-language agreement between you and ${c.legalName}. Please read them before you place an order. If something is unclear, [contact us](/docs/contacts) and we will explain.`,
+      `These terms are a plain-language agreement between you and ${inc.legalName}. Please read them before you place an order. If something is unclear, [contact us](/docs/contacts) and we will explain.`,
     ),
   ],
   sections: [
@@ -121,7 +121,7 @@ export const terms: DocPage = {
       title: "Intellectual property",
       blocks: [
         p(
-          `The First Depot name, logo, product photos and website content belong to ${c.legalName} or its suppliers. You may view and print pages for your own personal use, but you may not copy or reuse them commercially without our written permission.`,
+          `The First Depot name, logo, product photos and website content belong to ${inc.legalName} or its subsidiary businesses & suppliers. You may view and print pages for your own personal use, but you may not copy or reuse them commercially without our written permission.`,
         ),
       ],
     },
@@ -142,7 +142,7 @@ export const terms: DocPage = {
       title: "Governing law and disputes",
       blocks: [
         p(
-          `These terms are governed by the laws of the Republic of Uganda. We would always rather fix a problem directly, so please [contact us](/docs/contacts) first. If we cannot resolve it, the courts of Uganda have jurisdiction.`,
+          `These terms are governed by the laws of the United State of America and by the laws of the Republic of Uganda through the subsidiaries of ${inc.legalName}. We would always rather fix a problem directly, so please [contact us](/docs/contacts) first. If we cannot resolve it, the courts of both Countries have jurisdiction.`,
         ),
       ],
     },

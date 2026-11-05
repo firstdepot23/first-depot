@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createProduct,
+  createProductsBulk,
   deleteProduct,
   getProduct,
   getProducts,
@@ -10,8 +11,10 @@ import { shouldBeAdmin } from "../middleware/authMiddleware";
 
 const router: Router = Router();
 
-// Creating a product used to be open to anyone; it is admin-only now.
+// Creating product used to be open to anyone; it is admin-only now.
 router.post("/", shouldBeAdmin, createProduct);
+// One supplier delivery = many grocery / pharmacy products at once.
+router.post("/bulk", shouldBeAdmin, createProductsBulk);
 router.put("/:id", shouldBeAdmin, updateProduct);
 router.delete("/:id", shouldBeAdmin, deleteProduct);
 router.get("/", getProducts);

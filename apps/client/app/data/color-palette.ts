@@ -1,4 +1,17 @@
-const palette = [
+export type ColorItem = {
+  code: string;
+  name: string;
+  hex: string;
+};
+
+export type ColorGroup = {
+  id: string;
+  label: string;
+  dot: string;
+  colors: ColorItem[];
+};
+
+const palette: ColorGroup[] = [
   {
     "id": "greys-whites",
     "label": "Greys & Whites",

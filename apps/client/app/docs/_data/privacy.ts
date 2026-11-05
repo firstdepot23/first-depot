@@ -1,4 +1,4 @@
-import { company as c } from "./company";
+import { businesses, company as c, inc } from "./company";
 import { p, ul, table, note, type DocPage } from "./schema";
 
 export const privacy: DocPage = {
@@ -10,8 +10,11 @@ export const privacy: DocPage = {
   updated: "October 2026",
   numbered: true,
   intro: [
+    note(
+      `${inc.legalName} is a Delaware technology company behind the retail business of it's subsidaries; ${c.legalName}, OxPharm Health Limited & MD Clove`,
+    ),
     p(
-      `We only collect the information we need to sell you hardware, deliver it, and look after you afterwards. This policy explains what that is and how we protect it. We follow the Data Protection and Privacy Act, 2019 of Uganda.`,
+      `We only collect the information we need to sell you hardware, groceries and pharmacy products, deliver them, and look after you afterwards. This policy explains what that is and how we protect it. We follow the Data Protection and Privacy Act, 2019 of Uganda.`,
     ),
   ],
   sections: [
@@ -20,7 +23,10 @@ export const privacy: DocPage = {
       title: "Who we are",
       blocks: [
         p(
-          `${c.legalName} ("First Depot", "we", "us") is the data controller for the personal information described here. Our address is ${c.address}.`,
+          `The First Depot online store is run by ${inc.legalName}, ${inc.description}, for three companies registered in Uganda: ${c.legalName}, OxPharm Health Limited and MD Clove. When you order from one of them, that company is the data controller for the personal information described here. ${inc.legalName} runs the store and its systems on their behalf. In this policy, "First Depot", "we" and "us" mean these companies together.`,
+        ),
+        p(
+          `The address of ${c.legalName} is ${c.address}.`,
         ),
         p(
           `Our data protection contact is reachable at [${c.email.privacy}](mailto:${c.email.privacy}).`,
@@ -62,6 +68,9 @@ export const privacy: DocPage = {
         p(
           `You can also give us information directly, for example when you write to our support team or leave a review.`,
         ),
+        p(
+          `Pharmacy orders can reveal something about your health. We treat that information with extra care and use it only to prepare and deliver your order and to look after you afterwards.`,
+        ),
       ],
     },
     {
@@ -87,10 +96,20 @@ export const privacy: DocPage = {
           `We share information only with people who need it to serve you, and only what they need:`,
         ),
         ul(
+          `**Other companies in the First Depot group.** The company you ordered from, and ${inc.legalName}, which runs the store and its systems.`,
           "**Payment provider.** To take and confirm your payment.",
           "**Delivery partners.** Your name, phone number and address, so your goods arrive.",
           "**Service providers.** Hosting, email and customer-support tools that work on our behalf under contract.",
           "**Authorities.** When the law requires it, or to protect our customers and staff.",
+        ),
+      ],
+    },
+    {
+      id: "transfers",
+      title: "Where your information is stored",
+      blocks: [
+        p(
+          `Because ${inc.legalName} is based in the United States and our hosting providers may be outside Uganda, your information may be processed outside Uganda. Where that happens, we require the same level of protection and only use providers bound by contract to protect it.`,
         ),
       ],
     },

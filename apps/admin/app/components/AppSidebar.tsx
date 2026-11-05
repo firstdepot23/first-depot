@@ -4,14 +4,17 @@ import {
   Calendar,
   Search,
   Settings,
-  User2,
-  ChevronUp,
   Plus,
   Shirt,
   User,
   ShoppingBasket,
+  ShoppingCart,
+  Pill,
+  Hammer,
+  UtensilsCrossed,
   Newspaper,
 } from "lucide-react";
+import { SEGMENT_LABELS, SEGMENT_ORDER, type Segment } from "@repo/types";
 import {
   Sidebar,
   SidebarContent,
@@ -22,24 +25,20 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
 } from "./ui/sidebar";
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import InboxBadge from "./InboxBadge";
 import { Sheet, SheetTrigger } from "./ui/sheet";
 import AddOrder from "./AddOrder";
 import AddUser from "./AddUser";
 import AddCategory from "./AddCategory";
 import AddProduct from "./AddProduct";
+import SidebarUserMenu from "./SidebarUserMenu";
 
 const items = [
   {
@@ -49,7 +48,7 @@ const items = [
   },
   {
     title: "Inbox",
-    url: "#",
+    url: "/emails",
     icon: Inbox,
   },
   {
@@ -68,6 +67,13 @@ const items = [
     icon: Settings,
   },
 ];
+
+const segmentIcons: Record<Segment, typeof Hammer> = {
+  GROCERY: ShoppingCart,
+  FASTFOOD: UtensilsCrossed,
+  PHARMACY: Pill,
+  HARDWARE: Hammer,
+};
 
 const AppSidebar = () => {
   return (
@@ -99,7 +105,9 @@ const AppSidebar = () => {
                     </Link>
                   </SidebarMenuButton>
                   {item.title === "Inbox" && (
-                    <SidebarMenuBadge>24</SidebarMenuBadge>
+                    <Suspense fallback={null}>
+                      <InboxBadge />
+                    </Suspense>
                   )}
                 </SidebarMenuItem>
               ))}
@@ -108,9 +116,6 @@ const AppSidebar = () => {
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Products</SidebarGroupLabel>
-          <SidebarGroupAction>
-            <Plus /> <span className="sr-only">Add Product</span>
-          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -121,33 +126,56 @@ const AppSidebar = () => {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <SidebarMenuButton>
-                      <Plus />
-                      <span>Add Product</span>
-                    </SidebarMenuButton>
-                  </SheetTrigger>
-
-                  <AddProduct />
-                </Sheet>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <SidebarMenuButton>
-                      <Plus />
-                      <span>Add Category</span>
-                    </SidebarMenuButton>
-                  </SheetTrigger>
-
-                  <AddCategory />
-                </Sheet>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* One section per segment, in the order Grocery, Pharmacy,
+            Hardware (SEGMENT_ORDER). */}
+        {SEGMENT_ORDER.map((segment) => {
+          const Icon = segmentIcons[segment];
+          const label = SEGMENT_LABELS[segment];
+          return (
+            <SidebarGroup key={segment}>
+              <SidebarGroupLabel>{label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={`/products?segment=${segment}`}>
+                        <Icon />
+                        See {label} Products
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <SidebarMenuButton>
+                          <Plus />
+                          <span>Add {label} Products</span>
+                        </SidebarMenuButton>
+                      </SheetTrigger>
+
+                      <AddProduct segment={segment} />
+                    </Sheet>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <SidebarMenuButton>
+                          <Plus />
+                          <span>Add {label} Category</span>
+                        </SidebarMenuButton>
+                      </SheetTrigger>
+
+                      <AddCategory defaultSegment={segment} />
+                    </Sheet>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
         <SidebarGroup>
           <SidebarGroupLabel>Blog</SidebarGroupLabel>
           <SidebarGroupAction asChild>
@@ -240,18 +268,8 @@ const AppSidebar = () => {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton>
-                  <User2 /> John Doe <ChevronUp className="ml-auto" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>Account</DropdownMenuItem>
-                <DropdownMenuItem>Setting</DropdownMenuItem>
-                <DropdownMenuItem>Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* The signed-in user (name, email, photo) with Account and Sign out */}
+            <SidebarUserMenu />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@repo/product-db";
 import { PRICE_DIVISOR } from "./_config";
+import { QUOTE_PRODUCT_FILTER } from "./_catalog";
 import QuoteForm from "./QuoteForm";
 import type { CatalogProduct } from "./schema";
 
 export const metadata: Metadata = {
   title: "Get a quote | FIRST DEPOT",
   description:
-    "Send us your bill of quantities or a list of items and we'll price it, confirm stock and arrange delivery.",
+    "Send us your bill of quantities or a list of hardware and building materials and we'll price it, confirm stock and arrange delivery.",
 };
 
-// Product list is cached for five minutes.
+// Product list is cached for five minutes. Hardware products only.
 export const revalidate = 300;
 
 const loadCatalog = async (): Promise<CatalogProduct[]> => {
   try {
     const rows = await prisma.product.findMany({
+      where: QUOTE_PRODUCT_FILTER,
       select: {
         id: true,
         name: true,
@@ -51,9 +54,26 @@ const QuotePage = async () => {
           Get a quote
         </h1>
         <p className="mt-3 text-base text-gray-500">
-          Build your bill of quantities below. Pick items from our catalogue or
-          add your own, with your own prices if you have them. We reply with a
-          confirmed price, stock and delivery.
+          Build your bill of quantities below. Pick items from our hardware
+          catalogue or add your own, with your own prices if you have them. We
+          reply with a confirmed price, stock and delivery.
+        </p>
+        <p className="mt-2 text-sm text-gray-500">
+          Quotes are for hardware and building materials. For{" "}
+          <Link
+            href="/products?segment=grocery"
+            className="font-medium text-green-700 underline underline-offset-2 hover:text-green-600"
+          >
+            groceries
+          </Link>{" "}
+          or the{" "}
+          <Link
+            href="/pharmacy"
+            className="font-medium text-green-700 underline underline-offset-2 hover:text-green-600"
+          >
+            pharmacy
+          </Link>
+          , shop online.
         </p>
       </header>
       <QuoteForm catalog={catalog} />

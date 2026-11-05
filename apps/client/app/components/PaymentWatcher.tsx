@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import useCartStore from "../stores/storeCart";
+import { groupCart, useCheckoutCart } from "../lib/segmentCart";
 
 const POLL_MS = 5_000;
 const MAX_WATCH_MS = 10 * 60 * 1000;
@@ -15,6 +16,11 @@ const MAX_WATCH_MS = 10 * 60 * 1000;
 // approving a mobile money prompt in another app.
 const PaymentWatcher = () => {
   const requestReconcile = useCartStore((state) => state.requestReconcile);
+  // Watch only the cart being paid for. The other carts stay full after this
+  // one is paid, so "the whole cart is empty" is no longer the signal to stop.
+  const { segment } = useCheckoutCart();
+  const segmentRef = useRef(segment);
+  segmentRef.current = segment;
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -25,7 +31,9 @@ const PaymentWatcher = () => {
     };
 
     const timer = setInterval(() => {
-      const cartIsEmpty = useCartStore.getState().cart.length === 0;
+      const cartIsEmpty =
+        groupCart(useCartStore.getState().cart)[segmentRef.current].length ===
+        0;
       if (cartIsEmpty || Date.now() - startedAt > MAX_WATCH_MS) {
         clearInterval(timer);
         return;

@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useState } from "react";
-import useCartStore from "../stores/storeCart";
+import { useCheckoutCart } from "../lib/segmentCart";
 
 type Status = "idle" | "loading" | "ready" | "failed";
 
@@ -14,7 +14,9 @@ const PAYMENT_API = "/api/svc/payment";
 // Card details are entered on Pesapal's secure hosted page inside the iframe
 // below - this component never sees or sends a card number or CVV.
 const BankCardForm = () => {
-  const { cart } = useCartStore();
+  // Only the cart being paid for (hardware, grocery OR pharmacy), never all
+  // three: paying one cart must not charge the others.
+  const { items } = useCheckoutCart();
   const { getToken } = useAuth();
 
   const [status, setStatus] = useState<Status>("idle");
@@ -33,7 +35,7 @@ const BankCardForm = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ cart }),
+        body: JSON.stringify({ cart: items }),
       });
 
       if (!res.ok) {

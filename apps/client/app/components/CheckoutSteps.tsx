@@ -3,9 +3,9 @@
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import useCartStore from "../stores/storeCart";
 import useCheckoutStore from "../stores/storeCheckout";
 import { CHECKOUT_STEPS, getActiveStep } from "../lib/checkout";
+import { useCheckoutCart, withSegment } from "../lib/segmentCart";
 
 // Compact on phones (number on top, short label underneath), roomier on
 // desktop. Completed steps can be clicked to go back; later steps unlock
@@ -13,7 +13,9 @@ import { CHECKOUT_STEPS, getActiveStep } from "../lib/checkout";
 const CheckoutSteps = () => {
   const pathname = usePathname();
   const activeStep = getActiveStep(pathname);
-  const hasItems = useCartStore((state) => state.cart.length > 0);
+  // Step links keep you in the same cart (?segment=...).
+  const { segment, items } = useCheckoutCart();
+  const hasItems = items.length > 0;
   const hasShipping = useCheckoutStore((state) => state.shipping !== null);
 
   const isEnabled = (step: number) => {
@@ -62,7 +64,10 @@ const CheckoutSteps = () => {
               className={`flex items-start ${index < CHECKOUT_STEPS.length - 1 ? "flex-1" : ""}`}
             >
               {enabled && !isActive ? (
-                <Link href={step.href} className="cursor-pointer">
+                <Link
+                  href={withSegment(step.href, segment)}
+                  className="cursor-pointer"
+                >
                   {content}
                 </Link>
               ) : (

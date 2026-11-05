@@ -142,5 +142,5 @@ export type CartStoreActionsType = {
   // Clears any load error and asks CartSync to fetch the cart again.
   requestReload: () => void;
   // Asks CartSync to check for paid orders and drop their items from the cart.
-  requestReconcile: () => void;
+  requestReconcile: () => void; 
 };

@@ -4,10 +4,13 @@ import type { Metadata } from "next";
 import { photosForColor } from "@repo/types";
 import ProductGallery from "../../components/ProductGallery";
 import ProductInteraction from "../../components/ProductInteraction";
+import ProductPrice from "../../components/ProductPrice";
 import PaymentMethods from "../../components/PaymentMethods";
 import { ProductSelectionProvider } from "../../components/ProductSelection";
-import { categories } from "../../data/categoryData";
+import ProductFacts from "../../components/ProductFacts";
+import { fromApiSegment, SEGMENT_META } from "../../data/segments";
 import { getPostsForProduct } from "../../lib/blog";
+import { getCategoryName } from "../../lib/getCategories";
 import { getProduct } from "../../lib/getProduct";
 
 type Props = {
@@ -61,9 +64,14 @@ const ProductPage = async ({ params, searchParams }: Props) => {
   const selectedColor =
     color && product.colors.includes(color) ? color : (product.colors[0] ?? "");
 
+  // Which section this product belongs to drives the breadcrumb, the category
+  // name lookup and which extras (guides link, product information) show.
+  const segment = fromApiSegment(product.segment);
+  const segmentLabel = SEGMENT_META[segment].label;
+
   const categorySlug = (product as { categorySlug?: string }).categorySlug;
   const categoryName = categorySlug
-    ? (categories.find((c) => c.slug === categorySlug)?.name ?? categorySlug)
+    ? await getCategoryName(segment, categorySlug)
     : undefined;
 
   // Blog posts written about this product. A blog hiccup must never take the
@@ -93,11 +101,18 @@ const ProductPage = async ({ params, searchParams }: Props) => {
           >
             Shop
           </Link>
+          <Chevron />
+          <Link
+            href={`/products?segment=${segment}`}
+            className="transition-colors hover:text-green-700"
+          >
+            {segmentLabel}
+          </Link>
           {categorySlug && (
             <>
               <Chevron />
               <Link
-                href={`/products?category=${encodeURIComponent(categorySlug)}`}
+                href={`/products?segment=${segment}&category=${encodeURIComponent(categorySlug)}`}
                 className="transition-colors hover:text-green-700"
               >
                 {categoryName}
@@ -123,14 +138,8 @@ const ProductPage = async ({ params, searchParams }: Props) => {
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-gray-900 [overflow-wrap:anywhere] sm:text-5xl">
                 {product.name}
               </h1>
-              <p className="mt-4 text-gray-900">
-                <span className="mr-1.5 text-sm font-medium text-gray-500">
-                  UGX
-                </span>
-                <span className="text-3xl font-semibold tracking-tight">
-                  {product.price.toLocaleString()}
-                </span>
-              </p>
+              {/* Follows the chosen pack size and accompaniments. */}
+              <ProductPrice product={product} />
               <p className="mt-4 text-base leading-relaxed text-gray-600 [overflow-wrap:anywhere]">
                 {product.description}
               </p>
@@ -139,6 +148,10 @@ const ProductPage = async ({ params, searchParams }: Props) => {
             <hr className="border-gray-200" />
 
             <ProductInteraction product={product} />
+
+            {/* Ingredient / strength / storage / registration / expiry for
+                grocery and pharmacy. Renders nothing for hardware. */}
+            <ProductFacts product={product} />
 
             <hr className="border-gray-200" />
 
@@ -168,7 +181,7 @@ const ProductPage = async ({ params, searchParams }: Props) => {
                   </Link>
                 ))}
               </div>
-            ) : (
+            ) : segment === "hardware" ? (
               <Link
                 href="/blog?category=Guides"
                 className="group flex items-center justify-between gap-3 rounded-2xl border border-gray-200 p-5 transition-shadow hover:shadow-lg hover:shadow-gray-900/5"
@@ -185,7 +198,7 @@ const ProductPage = async ({ params, searchParams }: Props) => {
                   Guides <Chevron />
                 </span>
               </Link>
-            )}
+            ) : null}
 
             <p className="text-xs leading-relaxed text-gray-500">
               By placing an order, you agree to our{" "}

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-// Same-origin relay to the cart and payment services.
+// Same-origin relay to the cart, payment and pharmacy services.
 //
 // The browser calls   https://first-depot.com/api/svc/cart/cart
 // and this server calls https://<cart-service>.onrender.com/cart
@@ -18,11 +18,17 @@ export const dynamic = "force-dynamic";
 // A sleeping free-tier service can take a minute to wake up.
 const UPSTREAM_TIMEOUT_MS = 80_000;
 
-type ServiceName = "cart" | "payment";
+type ServiceName = "cart" | "payment" | "pharmacy";
 
 const SERVICES: Record<
   ServiceName,
-  { baseUrl: () => string | undefined; allowed: string[] }
+  {
+    baseUrl: () => string | undefined;
+    allowed: string[];
+    // Path prefixes that are never reachable through here, even though their
+    // first segment is allowed.
+    denied?: string[];
+  }
 > = {
   cart: {
     baseUrl: () =>
@@ -36,6 +42,16 @@ const SERVICES: Record<
     // Only what the shop uses. The Pesapal webhook (/webhooks) and /health
     // are deliberately NOT reachable through here.
     allowed: ["checkout", "payments", "mobile-money", "bank-card"],
+  },
+  pharmacy: {
+    baseUrl: () =>
+      process.env.PHARMACY_SERVICE_URL ??
+      process.env.NEXT_PUBLIC_PHARMACY_SERVICE_URL,
+    // Customers: upload a prescription, list their own, view their own photos.
+    // The pharmacist endpoints (/prescriptions/admin/..., status changes) are
+    // for the admin app and are deliberately NOT reachable from the shop.
+    allowed: ["prescriptions"],
+    denied: ["prescriptions/admin"],
   },
 };
 
@@ -70,6 +86,11 @@ const forward = async (req: NextRequest, ctx: Context): Promise<Response> => {
     return reply("Not found", 404);
   }
 
+  const joinedPath = path.join("/");
+  if (config.denied?.some((prefix) => joinedPath.startsWith(prefix))) {
+    return reply("Not found", 404);
+  }
+
   const base = config.baseUrl()?.replace(/\/+$/, "");
   if (!base) {
     console.error(`API relay: no URL configured for the ${service} service`);
@@ -90,17 +111,20 @@ const forward = async (req: NextRequest, ctx: Context): Promise<Response> => {
     const upstream = await fetch(target, {
       method: req.method,
       headers,
-      body: hasBody ? await req.text() : undefined,
+      // arrayBuffer, not text(): prescription photos are binary, and reading
+      // them as text would corrupt every byte that isn't valid UTF-8.
+      body: hasBody ? await req.arrayBuffer() : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
-    return new Response(await upstream.text(), {
+    return new Response(await upstream.arrayBuffer(), {
       status: upstream.status,
       headers: {
         "Content-Type":
           upstream.headers.get("content-type") ?? "application/json",
         "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

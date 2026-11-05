@@ -22,6 +22,8 @@ const SERVICES = [
   "https://cart.first-depot.com",
   "https://orders.first-depot.com",
   "https://payment.first-depot.com",
+  "https://email-service.first-depot.com",
+  "https://auth-service.first-depot.com",
 ];
 // Tip: if a service has a lightweight health route, use it, e.g.
 // "https://payment.first-depot.com/api/health". GET only; this script never
@@ -31,7 +33,9 @@ const env = process.env;
 const INTERVAL_MS = Number(env.KEEP_WARM_INTERVAL_MIN ?? 10) * 60_000;
 const TIMEOUT_MS = Number(env.KEEP_WARM_TIMEOUT_SEC ?? 60) * 1000;
 const URLS = env.KEEP_WARM_URLS
-  ? env.KEEP_WARM_URLS.split(",").map((u) => u.trim()).filter(Boolean)
+  ? env.KEEP_WARM_URLS.split(",")
+      .map((u) => u.trim())
+      .filter(Boolean)
   : SERVICES;
 const ONCE = process.argv.includes("--once");
 const ALERT = env.KEEP_WARM_ALERT_WEBHOOK;
@@ -47,7 +51,10 @@ async function ping(url) {
       const res = await fetch(url, {
         method: "GET",
         redirect: "manual", // a redirect to sign-in still proves the app is awake
-        headers: { "user-agent": "first-depot-keep-warm/1.0", accept: "text/html,*/*" },
+        headers: {
+          "user-agent": "first-depot-keep-warm/1.0",
+          accept: "text/html,*/*",
+        },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       await res.arrayBuffer().catch(() => {}); // finish the response
@@ -56,7 +63,15 @@ async function ping(url) {
       if (res.status < 500) return { url, ok: true, status: res.status, ms };
       last = { url, ok: false, status: res.status, ms };
     } catch (err) {
-      last = { url, ok: false, error: err?.name === "TimeoutError" ? "timeout" : String(err?.cause?.code ?? err?.message ?? err), ms: Date.now() - started };
+      last = {
+        url,
+        ok: false,
+        error:
+          err?.name === "TimeoutError"
+            ? "timeout"
+            : String(err?.cause?.code ?? err?.message ?? err),
+        ms: Date.now() - started,
+      };
     }
     if (attempt === 1) await new Promise((r) => setTimeout(r, 5000));
   }
@@ -66,11 +81,16 @@ async function ping(url) {
 async function round() {
   const results = await Promise.all(URLS.map(ping));
   for (const r of results) {
-    console.log(`${stamp()}  ${r.ok ? "OK  " : "DOWN"}  ${r.url}  ${r.status ?? r.error}  ${r.ms}ms`);
+    console.log(
+      `${stamp()}  ${r.ok ? "OK  " : "DOWN"}  ${r.url}  ${r.status ?? r.error}  ${r.ms}ms`,
+    );
   }
   const down = results.filter((r) => !r.ok);
   if (down.length && ALERT) {
-    const text = "First Depot keep-warm: " + down.map((d) => `${d.url} (${d.status ?? d.error})`).join(", ") + " not responding";
+    const text =
+      "First Depot keep-warm: " +
+      down.map((d) => `${d.url} (${d.status ?? d.error})`).join(", ") +
+      " not responding";
     await fetch(ALERT, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -84,10 +104,16 @@ if (ONCE) {
   const allUp = await round();
   process.exit(allUp ? 0 : 1);
 } else {
-  console.log(`${stamp()}  keep-warm started: ${URLS.length} services every ${INTERVAL_MS / 60_000} min`);
+  console.log(
+    `${stamp()}  keep-warm started: ${URLS.length} services every ${INTERVAL_MS / 60_000} min`,
+  );
   // Wait for the previous round to finish before scheduling the next one.
   for (;;) {
-    try { await round(); } catch (e) { console.error(`${stamp()}  round failed: ${e.message}`); }
+    try {
+      await round();
+    } catch (e) {
+      console.error(`${stamp()}  round failed: ${e.message}`);
+    }
     await new Promise((r) => setTimeout(r, INTERVAL_MS));
   }
 }

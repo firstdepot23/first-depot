@@ -6,8 +6,7 @@ import { blogFontClass, blogFontStyle } from "../components/blog/blogFont";
 
 export const metadata: Metadata = {
   title: "Blog | FIRST DEPOT",
-  description:
-    "Guides, project ideas and product news to help you build comfort for your home.",
+  description: "Guides, project ideas and product news to help you.",
   alternates: {
     canonical: "/blog",
   },
@@ -53,7 +52,7 @@ const BlogPage = async ({
             Blog
           </h1>
           <p className="mt-3 max-w-md text-base text-gray-500">
-            Guides, project ideas and product news for building comfort at home.
+            Guides, project ideas and product news to help you.
           </p>
         </div>
         <Link

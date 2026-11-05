@@ -1,11 +1,16 @@
-import { Prisma, prisma } from "@repo/product-db";
+import { Prisma, prisma, Segment } from "@repo/product-db";
 import { Request, Response } from "express";
 
+const VALID_SEGMENTS = Object.values(Segment);
+const isValidSegment = (value: unknown): value is Segment =>
+  typeof value === "string" && (VALID_SEGMENTS as string[]).includes(value);
 
 const hasPrismaCode = (error: unknown, code: string) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 
-
+// The unique constraint is now (segment, slug) rather than slug alone (see
+// schema.prisma), but Prisma's P2002 error still names "slug" in its
+// message for that compound index, so this heuristic still works unchanged.
 const duplicateField = (error: unknown): "slug" | "name" | undefined => {
   const text = error instanceof Error ? error.message : "";
   if (text.includes("slug")) return "slug";
@@ -18,7 +23,7 @@ const duplicateMessage = (
   data: { name?: unknown; slug?: unknown },
 ) => {
   if (field === "slug") {
-    return `The slug "${String(data.slug)}" is already used by another category.`;
+    return `The slug "${String(data.slug)}" is already used by another category in this segment.`;
   }
   if (field === "name") {
     return `A category named "${String(data.name)}" already exists.`;
@@ -32,6 +37,10 @@ export const createCategory = async (req: Request, res: Response) => {
 
     if (!data?.name || !data?.slug) {
       return res.status(400).json({ message: "Name and slug are required" });
+    }
+    const segmentInput = (req.body as { segment?: unknown }).segment;
+    if (segmentInput !== undefined && !isValidSegment(segmentInput)) {
+      return res.status(400).json({ message: "Invalid segment" });
     }
 
     const category = await prisma.category.create({ data });
@@ -102,7 +111,17 @@ export const deleteCategory = async (req: Request, res: Response) => {
 
 export const getCategories = async (req: Request, res: Response) => {
   try {
-    const categories = await prisma.category.findMany();
+    const { segment } = req.query;
+    if (segment !== undefined && !isValidSegment(segment)) {
+      return res.status(400).json({ message: "Invalid segment" });
+    }
+
+    const categories = await prisma.category.findMany({
+      // No segment passed = every category across every segment. Pages
+      // built per segment (client, admin - later) are expected to always
+      // pass this, e.g. ?segment=PHARMACY.
+      where: isValidSegment(segment) ? { segment } : undefined,
+    });
     return res.status(200).json(categories);
   } catch (error) {
     console.error("getCategories failed:", error);

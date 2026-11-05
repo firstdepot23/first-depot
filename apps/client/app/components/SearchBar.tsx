@@ -4,9 +4,26 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ProductType } from "@repo/types";
-import { categories } from "../data/categoryData";
+import { categories, type CategoryOption } from "../data/categoryData";
 import { buildSearchPlan } from "../data/searchTerms";
+import {
+  fromApiSegment,
+  SEGMENT_META,
+  SEGMENT_SLUGS,
+  toApiSegment,
+  type SegmentSlug,
+} from "../data/segments";
 import { startLoader } from "./NavigationProgress";
+
+// Pharmacy has its own dedicated search on its own page, so it's
+// deliberately left out of this global nav search bar - both as a
+// "Search in" section you can pick, and from "All sections" live
+// suggestions. Scoped to this file rather than segments.ts, since the
+// pharmacy page and the /products combined view still need the full
+// segment list for their own purposes.
+const SEARCHABLE_SEGMENTS: SegmentSlug[] = SEGMENT_SLUGS.filter(
+  (s) => s !== "pharmacy",
+);
 
 /**
  * Collapsed: a single round search icon that sits in the navbar.
@@ -26,10 +43,18 @@ const SearchBar = () => {
 
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
-  // Always starts as "all" so a search covers every product. Pick a chip to
-  // narrow it down. (It used to copy the page's current category, which made
-  // every search silently stick to e.g. "glass".)
+  // Always starts as "all" (every section, shown grouped by section). Pick a
+  // section to search inside just that one, then a chip to narrow further.
+  // (It used to copy the page's current category, which made every search
+  // silently stick to e.g. "glass".)
+  const [segment, setSegment] = useState<"all" | SegmentSlug>("all");
   const [category, setCategory] = useState("all");
+  // Grocery category chips come from the database, loaded the first time
+  // that section is picked. Hardware uses the static list. (Pharmacy never
+  // appears here, so it never needs its chips loaded in this component.)
+  const [segmentCategories, setSegmentCategories] = useState<
+    Partial<Record<SegmentSlug, CategoryOption[]>>
+  >({});
   const [suggestions, setSuggestions] = useState<ProductType[]>([]);
   const [suggestionsError, setSuggestionsError] = useState(false);
 
@@ -47,9 +72,24 @@ const SearchBar = () => {
   };
 
   const openSearch = () => {
+    setSegment("all");
     setCategory("all");
     setOpen(true);
   };
+
+  const chooseSegment = (next: "all" | SegmentSlug) => {
+    setSegment(next);
+    setCategory("all"); // categories belong to one section
+  };
+
+  // Category chips for the chosen section ("all" has none: categories differ
+  // per section).
+  const categoryOptions: CategoryOption[] =
+    segment === "all"
+      ? []
+      : segment === "hardware"
+        ? categories
+        : [{ name: "All", slug: "all" }, ...(segmentCategories[segment] ?? [])];
 
   const closeSearch = () => {
     setOpen(false);
@@ -88,13 +128,47 @@ const SearchBar = () => {
     };
   }, [open]);
 
-  // Work out whether the chip arrows are needed once the card is on screen.
+  // Work out whether the chip arrows are needed once the card is on screen
+  // (and again whenever the chips change with the chosen section).
   useEffect(() => {
     if (!open) return;
     updateArrows();
     window.addEventListener("resize", updateArrows);
     return () => window.removeEventListener("resize", updateArrows);
-  }, [open]);
+  }, [open, segment, categoryOptions.length]);
+
+  // Load grocery categories the first time they're needed.
+  useEffect(() => {
+    if (!open || segment === "all" || segment === "hardware") return;
+    if (segmentCategories[segment]) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL}/categories?segment=${toApiSegment(segment)}`,
+        );
+        if (!res.ok) return;
+        const data: unknown = await res.json();
+        if (cancelled || !Array.isArray(data)) return;
+        setSegmentCategories((prev) => ({
+          ...prev,
+          [segment]: data
+            .filter(
+              (c): c is CategoryOption =>
+                !!c && typeof c.name === "string" && typeof c.slug === "string",
+            )
+            .map((c) => ({ name: c.name, slug: c.slug })),
+        }));
+      } catch {
+        // No chips is fine: searching the whole section still works.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, segment, segmentCategories]);
 
   // Debounced live suggestions, scoped to the selected department.
   useEffect(() => {
@@ -109,63 +183,89 @@ const SearchBar = () => {
     let cancelled = false;
 
     const timeout = setTimeout(async () => {
-      try {
-        // "paints" -> "paint"; "cement"/"bondware" -> the BondWare category.
-        const plan = buildSearchPlan(query, category === "all");
-        const params = new URLSearchParams();
-        if (plan.search) params.set("search", plan.search);
-        params.set("limit", "6");
-        if (plan.category) params.set("category", plan.category);
-        else if (category !== "all") params.set("category", category);
+      // "All" asks every searchable section for a few matches (pharmacy
+      // excluded - see SEARCHABLE_SEGMENTS above); a chosen section asks
+      // only itself. Each request names its segment, so nothing is mixed up
+      // server-side.
+      const targets: SegmentSlug[] =
+        segment === "all" ? SEARCHABLE_SEGMENTS : [segment];
+      const perSection = segment === "all" ? 3 : 6;
 
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL}/products?${params.toString()}`,
-        );
-        if (cancelled) return;
+      const settled = await Promise.allSettled(
+        targets.map(async (seg) => {
+          // Category words ("cement", "paints") are a hardware idea: only
+          // resolve them there, so "water" can't hijack a grocery search.
+          const allowCategory =
+            seg === "hardware" && (segment === "all" || category === "all");
+          const plan = buildSearchPlan(query, allowCategory);
 
-        if (!res.ok) {
-          setSuggestions([]);
-          setSuggestionsError(true);
-          return;
-        }
+          const params = new URLSearchParams();
+          params.set("segment", toApiSegment(seg));
+          if (plan.search) params.set("search", plan.search);
+          params.set("limit", String(perSection));
+          if (plan.category) params.set("category", plan.category);
+          else if (segment !== "all" && category !== "all")
+            params.set("category", category);
 
-        const data = await res.json();
-        if (cancelled) return;
-        setSuggestions(Array.isArray(data) ? data : []);
-        setSuggestionsError(false);
-      } catch {
-        if (cancelled) return;
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL}/products?${params.toString()}`,
+          );
+          if (!res.ok) throw new Error(`Suggestions failed (${res.status})`);
+          const data: unknown = await res.json();
+          return Array.isArray(data) ? (data as ProductType[]) : [];
+        }),
+      );
+      if (cancelled) return;
+
+      const ok = settled.filter(
+        (r): r is PromiseFulfilledResult<ProductType[]> =>
+          r.status === "fulfilled",
+      );
+      if (ok.length === 0) {
         setSuggestions([]);
         setSuggestionsError(true);
+        return;
       }
+      setSuggestions(ok.flatMap((r) => r.value));
+      setSuggestionsError(false);
     }, 250);
 
     return () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [value, category, open]);
+  }, [value, category, segment, open]);
 
   // `exact` is for clicking a suggested product name: search it as typed
-  // instead of treating it as a category word.
-  const runSearch = (query: string, exact = false) => {
+  // instead of treating it as a category word. `inSegment` is that product's
+  // own section, so the results page opens in the right one.
+  const runSearch = (query: string, exact = false, inSegment?: SegmentSlug) => {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    const plan = buildSearchPlan(trimmed, category === "all" && !exact);
+    const target: "all" | SegmentSlug = inSegment ?? segment;
+    // The category chip only applies inside the section it was picked in.
+    const useChip =
+      segment !== "all" && target === segment && category !== "all";
+    // Category words only mean something in hardware. In "all", the results
+    // page applies them to the hardware block only.
+    const plan = buildSearchPlan(
+      trimmed,
+      target === "hardware" && category === "all" && !exact,
+    );
 
     const params = new URLSearchParams(searchParams);
+    params.delete("search");
+    params.delete("category");
+    if (target === "all") params.delete("segment");
+    else params.set("segment", target);
+
     if (plan.category) {
       // The query named a category (e.g. "bondware", "cement", "paints").
-      params.delete("search");
       params.set("category", plan.category);
     } else {
       params.set("search", exact ? trimmed : plan.search);
-      if (category !== "all") {
-        params.set("category", category);
-      } else {
-        params.delete("category");
-      }
+      if (useChip) params.set("category", category);
     }
 
     startLoader();
@@ -174,7 +274,10 @@ const SearchBar = () => {
   };
 
   const trimmedValue = value.trim();
-  const plan = buildSearchPlan(trimmedValue, category === "all");
+  const plan = buildSearchPlan(
+    trimmedValue,
+    segment === "hardware" && category === "all",
+  );
 
   return (
     <Suspense fallback={null}>
@@ -257,56 +360,85 @@ const SearchBar = () => {
                   <p className="mb-2 px-4 text-xs font-medium uppercase tracking-wide text-gray-400">
                     Search in
                   </p>
-                  <div className="relative pb-4 md:pb-3">
-                    <div
-                      ref={chipsRef}
-                      onScroll={updateArrows}
-                      className="flex flex-wrap gap-2 px-4 md:flex-nowrap md:overflow-x-auto md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden"
-                    >
-                      {categories.map((c) => {
-                        const active = c.slug === category;
-                        return (
-                          <button
-                            key={c.slug}
-                            type="button"
-                            onClick={() => setCategory(c.slug)}
-                            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-                              active
-                                ? "border-black bg-black text-white"
-                                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
-                            }`}
-                          >
-                            {c.slug === "all" ? "All" : c.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {canScrollLeft && (
-                      <div className="pointer-events-none absolute inset-y-0 bottom-3 left-0 hidden w-14 items-center bg-gradient-to-r from-white via-white/80 to-transparent pl-2 md:flex">
+                  <div
+                    role="group"
+                    aria-label="Section"
+                    className={`flex flex-wrap gap-2 px-4 ${
+                      segment === "all" ? "pb-4 md:pb-3" : "pb-3"
+                    }`}
+                  >
+                    {(["all", ...SEARCHABLE_SEGMENTS] as const).map((s) => {
+                      const active = s === segment;
+                      return (
                         <button
+                          key={s}
                           type="button"
-                          onClick={() => scrollChips(-1)}
-                          aria-label="Scroll departments left"
-                          className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-100"
+                          aria-pressed={active}
+                          onClick={() => chooseSegment(s)}
+                          className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                            active
+                              ? "border-black bg-black text-white"
+                              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                          }`}
                         >
-                          <ChevronLeft className="h-4 w-4" />
+                          {s === "all" ? "All sections" : SEGMENT_META[s].label}
                         </button>
-                      </div>
-                    )}
-                    {canScrollRight && (
-                      <div className="pointer-events-none absolute inset-y-0 bottom-3 right-0 hidden w-14 items-center justify-end bg-gradient-to-l from-white via-white/80 to-transparent pr-2 md:flex">
-                        <button
-                          type="button"
-                          onClick={() => scrollChips(1)}
-                          aria-label="Scroll departments right"
-                          className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-100"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
+
+                  {segment !== "all" && (
+                    <div className="relative pb-4 md:pb-3">
+                      <div
+                        ref={chipsRef}
+                        onScroll={updateArrows}
+                        className="flex flex-wrap gap-2 px-4 md:flex-nowrap md:overflow-x-auto md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden"
+                      >
+                        {categoryOptions.map((c) => {
+                          const active = c.slug === category;
+                          return (
+                            <button
+                              key={c.slug}
+                              type="button"
+                              onClick={() => setCategory(c.slug)}
+                              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                                active
+                                  ? "border-black bg-black text-white"
+                                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              {c.slug === "all" ? "All" : c.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {canScrollLeft && (
+                        <div className="pointer-events-none absolute inset-y-0 bottom-3 left-0 hidden w-14 items-center bg-gradient-to-r from-white via-white/80 to-transparent pl-2 md:flex">
+                          <button
+                            type="button"
+                            onClick={() => scrollChips(-1)}
+                            aria-label="Scroll departments left"
+                            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-100"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                      {canScrollRight && (
+                        <div className="pointer-events-none absolute inset-y-0 bottom-3 right-0 hidden w-14 items-center justify-end bg-gradient-to-l from-white via-white/80 to-transparent pr-2 md:flex">
+                          <button
+                            type="button"
+                            onClick={() => scrollChips(1)}
+                            aria-label="Scroll departments right"
+                            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-100"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Results - scrolls on its own when there are many */}
@@ -342,11 +474,28 @@ const SearchBar = () => {
                           <li key={product.id}>
                             <button
                               type="button"
-                              onClick={() => runSearch(product.name, true)}
+                              onClick={() =>
+                                runSearch(
+                                  product.name,
+                                  true,
+                                  fromApiSegment(product.segment),
+                                )
+                              }
                               className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm transition-colors hover:bg-gray-100 active:bg-gray-200"
                             >
                               <Search className="h-4 w-4 shrink-0 text-gray-400" />
-                              <span className="truncate">{product.name}</span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {product.name}
+                              </span>
+                              {segment === "all" && (
+                                <span className="shrink-0 text-xs text-gray-400">
+                                  {
+                                    SEGMENT_META[
+                                      fromApiSegment(product.segment)
+                                    ].label
+                                  }
+                                </span>
+                              )}
                             </button>
                           </li>
                         ))}
