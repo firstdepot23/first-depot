@@ -21,12 +21,16 @@ import {
 // by one company (from the businesses list in company.ts):
 //   hardware -> First Depot Hardwares Limited
 //   grocery  -> MD Clove
+//   fastfood -> no separate company yet: shown under the group's own name
 //   pharmacy -> OxPharm Health Limited
 // ---------------------------------------------------------------------------
 
 const COMPANY_FOR: Record<SegmentSlug, string> = {
   hardware: "hardwares",
   grocery: "mdclove",
+  // No matching business in company.ts, so the section falls back to the
+  // group's own name. Put a business id here when fast food has its own company.
+  fastfood: "",
   pharmacy: "oxpharm",
 };
 
@@ -34,6 +38,7 @@ const COMPANY_FOR: Record<SegmentSlug, string> = {
 const PALETTE: Record<SegmentSlug, { bg: string; fg: string }> = {
   hardware: { bg: "c3e1d6", fg: "1e4a3c" },
   grocery: { bg: "f3e3b3", fg: "5a4300" },
+  fastfood: { bg: "f6d5c4", fg: "6b2e12" },
   pharmacy: { bg: "d6e4f5", fg: "1f3d66" },
 };
 
@@ -83,6 +88,7 @@ const make =
 
 const hw = make("hardware");
 const gr = make("grocery");
+const ff = make("fastfood");
 const ph = make("pharmacy");
 
 type Category = { title: string; blurb?: string; items: ProductItem[] };
@@ -165,6 +171,24 @@ const catalogue: Record<SegmentSlug, Category[]> = {
         gr("Laundry Detergent, 1 kg", 9000, "Hand and machine wash"),
         gr("Dish Soap, 750 ml", 5500, "Lemon"),
         gr("Toilet Paper, 10 rolls", 12000, "2-ply"),
+      ],
+    },
+  ],
+  fastfood: [
+    {
+      title: "Meals",
+      blurb: "Made to order. Pick your accompaniment when you order.",
+      items: [
+        ff("Chicken and Chips", 22000, "Choose chips or rice"),
+        ff("Beef Burger", 18000, "Add cheese or bacon"),
+        ff("Fish Fingers Meal", 20000, "Choose your side"),
+      ],
+    },
+    {
+      title: "Drinks",
+      items: [
+        ff("Fresh Passion Juice", 6000, "Chilled"),
+        ff("Soda, 500 ml", 3000, "Assorted"),
       ],
     },
   ],
