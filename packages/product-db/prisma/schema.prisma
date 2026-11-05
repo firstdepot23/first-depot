@@ -13,25 +13,191 @@ datasource db {
 provider = "postgresql"
 }
 
+// Which storefront a product/category belongs to. Add new segments here
+// later (e.g. ELECTRONICS) without touching existing rows - everything
+// already in the database keeps its current segment, and anything created
+// without specifying one defaults to HARDWARE.
+enum Segment {
+HARDWARE
+GROCERY
+PHARMACY
+// Restaurant / takeaway meals. Sold one at a time (no supplier deliveries,
+// no batch / expiry tracking)                                              ; extras are modelled with ProductOptionGroup.
+FASTFOOD
+}
+
+// How a customer picks from an option group on a fast-food product:
+// SINGLE = choose one (dropdown / radio), e.g. "Choose an accompaniment"
+// MULTIPLE = tick as many as they like (checkboxes), e.g. "Add a sauce +4,000"
+enum OptionSelection {
+SINGLE
+MULTIPLE
+}
+
 model Product {
 id Int @id @default(autoincrement())
+
+// Defaults to HARDWARE so every existing row - and anything created
+// without specifying a segment - lands in today's hardware catalog.
+segment Segment @default(HARDWARE)
+
 name String
 shortDescription String
 description String
+
+// Retail (selling) price, in the same unit you already use (whole UGX).
+// Kept as one "price" field across every segment so cart/checkout code
+// never needs to know which segment a line item came from.
+//
+// GROCERY products with pack sizes: this is the LOWEST pack price (the
+// "from" price). The real price of each pack lives on ProductVariant.
 price Int
+
+// Variant data. Hardware uses both (e.g. "4 Liters" + "Jet Black").
+// Grocery typically uses sizes only (e.g. "1 Kg") and leaves colors
+// empty. Pharmacy typically leaves both empty - see dosage fields below.
+//
+// GROCERY products with pack sizes: kept in sync with `variants` (the
+// list of pack labels) so older code that reads `sizes` keeps working.
 sizes String[]
 colors String[]
 images Json
 gallery Json @default("{}")
+
 createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
+
 categorySlug String
-category Category @relation(fields: [categorySlug], references: [slug])
+// Composite relation: a product's segment must match its category's
+// segment, enforced by the database - a pharmacy product can never be
+// filed under a hardware category, even by mistake.
+category Category @relation(fields: [segment, categorySlug], references: [segment, slug])
+
+// Grocery: one row per pack size, each with its own price / stock.
+variants ProductVariant[]
+// Fast food: accompaniments, substitutes and add-ons for this product.
+optionGroups ProductOptionGroup[]
+
+// ---------------------------------------------------------------------
+// Shared commerce / inventory fields - apply to any segment. These are
+// also what GLS (our point-of-sale and ledger software) would read for
+// margin and stock-value reporting.
+// ---------------------------------------------------------------------
+costPrice Int? // what the business paid for this stock
+wholesalePrice Int? // trade/bulk price, distinct from the retail `price`
+supplier String? // who the business buys this from
+barcode String? @unique // scanned at point of sale                       ; null if none
+
+// Units currently on hand. Bulk supplier entry (grocery / pharmacy) sets
+// this to the quantity supplied. Hardware rows stay at 0 until stock
+// tracking is switched on for them.
+//
+// GROCERY products with pack sizes: the total across all packs.
+stock Int @default(0)
+
+// ---------------------------------------------------------------------
+// Perishable tracking - grocery and pharmacy.
+// ---------------------------------------------------------------------
+batchNumber String?
+manufacturingDate DateTime?
+expiryDate DateTime?
+
+// ---------------------------------------------------------------------
+// Pharmacy-only fields.
+// ---------------------------------------------------------------------
+formulation String? // dosage form: tablet, syrup, capsule, injection, cream...
+dosageStrength String? // e.g. "500mg", "5mg/ml"
+activeIngredient String?
+manufacturer String? // who made the drug - distinct from `supplier`
+prescriptionRequired Boolean? @default(false)
+storageConditions String? // e.g. "Store below 25°C, away from light"
+registrationNumber String? // National Drug Authority (or equivalent) registration no.
+
+@@index([segment])
+}
+
+// One sellable pack of a product, with its own price and stock.
+// Rice might have "500 g" UGX 2,500, "1 Kg" UGX 4,500 and "25 Kg" UGX 95,000:
+// three rows here, one Product. Deleting the product deletes its packs.
+model ProductVariant {
+id Int @id @default(autoincrement())
+
+productId Int
+product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+// How the pack is described to the customer, e.g. "500 g", "1 Kg".
+label String
+
+// Selling price of THIS pack (whole UGX).
+price Int
+costPrice Int? // what the business paid for this pack
+stock Int @default(0)
+// Each pack can have its own barcode (scanned at the till).
+barcode String? @unique
+
+// Display order within the product (smallest pack first, normally).
+sortOrder Int @default(0)
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+
+// "1 Kg" can only appear once on the same product. That is checked by the
+// product service on every save (not by a database constraint), so renaming
+// two packs in one edit can't trip over each other.
+@@index([productId])
+}
+
+// A question asked on a fast-food product, e.g. "Choose an accompaniment",
+// "Choose a juice", "Add a sauce". The admin fills in the choices (ProductOption).
+model ProductOptionGroup {
+id Int @id @default(autoincrement())
+
+productId Int
+product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+name String
+selection OptionSelection @default(SINGLE)
+// true = the customer must answer before adding to the order.
+required Boolean @default(false)
+sortOrder Int @default(0)
+
+options ProductOption[]
+
+@@index([productId])
+}
+
+// One choice inside an option group, e.g. "Chips" (+0), "Masala chips" (+6,500).
+model ProductOption {
+id Int @id @default(autoincrement())
+
+groupId Int
+group ProductOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+name String
+// Added to the product price when chosen. 0 = included in the price.
+extraPrice Int @default(0)
+// Untick when it is sold out                                         ; it stays in the list but can't be chosen.
+available Boolean @default(true)
+sortOrder Int @default(0)
+
+@@index([groupId])
 }
 
 model Category {
 id Int @id @default(autoincrement())
+
+// Categories belong to one segment too (e.g. "Paints" is HARDWARE,
+// "Antibiotics" is PHARMACY), so each storefront only ever sees its own
+// category list.
+segment Segment @default(HARDWARE)
+
 name String
-slug String @unique
+slug String
 products Product[]
+
+// Slugs only need to be unique within their own segment now, not
+// globally - "dairy" (GROCERY) and "detergents" (HARDWARE) can coexist
+// even if two segments both happened to want the same slug.
+@@unique([segment, slug])
+@@index([segment])
 }

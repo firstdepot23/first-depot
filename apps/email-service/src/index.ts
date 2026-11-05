@@ -17,8 +17,8 @@ if (process.env.PORT) {
   }).listen(port, () => {
     console.log(`Email service health check listening on port ${port}`);
   });
-}
-
+} 
+ 
 const start = async () => {
   try {
     await consumer.connect();

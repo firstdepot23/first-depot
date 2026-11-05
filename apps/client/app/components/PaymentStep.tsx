@@ -5,11 +5,13 @@ import { MapPin, Store } from "lucide-react";
 import Link from "next/link";
 import useCheckoutStore from "../stores/storeCheckout";
 import { formatUGX } from "../lib/checkout";
+import { useCheckoutCart, withSegment } from "../lib/segmentCart";
 import PaymentMethodSelector from "./PaymentMethodSelector";
 import PaymentWatcher from "./PaymentWatcher";
 
 const PaymentStep = () => {
   const shipping = useCheckoutStore((state) => state.shipping);
+  const { segment } = useCheckoutCart();
   if (!shipping) return null;
 
   const isPickup = shipping.deliveryMethod === "pickup";
@@ -34,7 +36,7 @@ const PaymentStep = () => {
           </p>
         </div>
         <Link
-          href="/cart/shipping"
+          href={withSegment("/cart/shipping", segment)}
           className="shrink-0 text-xs text-gray-500 underline hover:text-black"
         >
           Change

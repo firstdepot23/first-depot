@@ -20,6 +20,7 @@ import {
   toShippingForm,
 } from "../api/svc/payment/paymentApi";
 import { formatUGX } from "../lib/checkout";
+import { useCheckoutCart, withSegment } from "../lib/segmentCart";
 import { startLoader } from "./NavigationProgress";
 
 const EMPTY_FORM: ShippingFormInputs = {
@@ -64,6 +65,10 @@ const ShippingForm = () => {
   const router = useRouter();
   const { getToken } = useAuth();
   const { user } = useUser();
+  // Which cart is being checked out (hardware, grocery or pharmacy). It must
+  // travel to the payment step in the URL, or that step can't tell which cart
+  // to charge.
+  const { segment } = useCheckoutCart();
 
   const savedShipping = useCheckoutStore((state) => state.shipping);
   const setShipping = useCheckoutStore((state) => state.setShipping);
@@ -181,7 +186,7 @@ const ShippingForm = () => {
     }
 
     startLoader();
-    router.push("/cart/payment");
+    router.push(withSegment("/cart/payment", segment));
   };
 
   const options = [

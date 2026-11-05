@@ -1,5 +1,6 @@
 "use client";
 
+import type { Choices } from "../lib/productChoices";
 import {
   createContext,
   useCallback,
@@ -10,7 +11,8 @@ import {
 } from "react";
 
 /**
- * Holds the chosen size + color for the product page so the gallery and the
+ * Holds the chosen size + color (and, for fast food, the picked accompaniments)
+ * for the product page so the gallery and the
  * options panel stay in sync instantly. Previously every click pushed a new URL
  * and re-fetched the whole product from the server; now the choice is local
  * state and the URL is only updated quietly (so a copied link still opens on
@@ -20,8 +22,11 @@ import {
 type Selection = {
   size: string;
   color: string;
+  // Fast food: option ids picked, per option group id.
+  choices: Choices;
   setSize: (size: string) => void;
   setColor: (color: string) => void;
+  setChoice: (groupId: number, optionIds: number[]) => void;
 };
 
 const SelectionContext = createContext<Selection | null>(null);
@@ -53,6 +58,7 @@ export const ProductSelectionProvider = ({
 }) => {
   const [size, setSizeState] = useState(initialSize);
   const [color, setColorState] = useState(initialColor);
+  const [choices, setChoices] = useState<Choices>({});
 
   const setSize = useCallback((value: string) => {
     setSizeState(value);
@@ -64,9 +70,13 @@ export const ProductSelectionProvider = ({
     syncUrl("color", value);
   }, []);
 
+  const setChoice = useCallback((groupId: number, optionIds: number[]) => {
+    setChoices((prev) => ({ ...prev, [groupId]: optionIds }));
+  }, []);
+
   const value = useMemo(
-    () => ({ size, color, setSize, setColor }),
-    [size, color, setSize, setColor],
+    () => ({ size, color, choices, setSize, setColor, setChoice }),
+    [size, color, choices, setSize, setColor, setChoice],
   );
 
   return (

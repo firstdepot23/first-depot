@@ -1,6 +1,10 @@
 import { about } from "./about";
+import { businesses } from "./businesses";
 import { contacts } from "./contacts";
 import { developer } from "./developer";
+import { glsDoc } from "./gls";
+import { glsPrivacy } from "./gls-privacy";
+import { glsTerms } from "./gls-terms";
 import { help } from "./help";
 import { privacy } from "./privacy";
 import { products } from "./products";
@@ -15,19 +19,25 @@ export const docs: DocPage[] = [
   privacy,
   returns,
   about,
+  businesses,
   contacts,
   help,
   security,
-  developer,
+  //developer,
   products,
+  glsDoc,
+  glsTerms,
+  glsPrivacy,
 ];
 
 // Order of the headings on the /docs index.
 export const groupOrder: DocGroup[] = [
   "Policies",
   "Company",
+  "Our Businesses",
   "Help and safety",
   "Build and shop",
+  "GLS",
 ];
 
 export const getDoc = (slug: string) => docs.find((d) => d.slug === slug);

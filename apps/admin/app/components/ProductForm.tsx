@@ -2,16 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import {
   allColors,
+  DEFAULT_IMAGE_KEY,
   MAX_GALLERY_IMAGES,
   ProductFormSchema,
   units,
   type CategoryType,
+  type Segment,
 } from "@repo/types";
 import {
   Form,
@@ -34,10 +36,22 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { cn } from "../lib/utils";
 import type { ProductFormValues } from "../lib/productApi";
+import { uploadToCloudinary } from "../lib/cloudinary";
+import SegmentFields from "./SegmentFields";
+import VariantsEditor, { type PackRow } from "./VariantsEditor";
+import OptionGroupsEditor, { type GroupRow } from "./OptionGroupsEditor";
+import {
+  collectIssues,
+  describeGroupIssue,
+  describePackIssue,
+  summarizePacks,
+} from "../lib/productExtras";
 
-const fetchCategories = async (): Promise<CategoryType[]> => {
+// Only this segment's categories: the database refuses a product whose
+// category belongs to a different segment.
+const fetchCategories = async (segment: Segment): Promise<CategoryType[]> => {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL}/categories`,
+    `${process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL}/categories?segment=${segment}`,
   );
   if (!res.ok) throw new Error("Failed to fetch categories!");
   return res.json();
@@ -57,13 +71,62 @@ const ProductForm = ({
   submitLabel,
 }: ProductFormProps) => {
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(ProductFormSchema),
+    // The schema fills in some fields (colors, images), so what goes in and what
+    // comes out of it differ slightly. The form only ever works with the filled-in
+    // version (ProductFormValues), so the resolver is typed as that.
+    resolver: zodResolver(
+      ProductFormSchema,
+    ) as unknown as Resolver<ProductFormValues>,
     defaultValues,
   });
 
+  const segment = form.watch("segment");
+  const isHardware = segment === "HARDWARE";
+  // Grocery is sold in packs, each with its own price (500 g, 1 Kg, 25 Kg).
+  const isGrocery = segment === "GROCERY";
+  // Fast food has accompaniments / drinks / add-ons the customer picks from.
+  const isFastFood = segment === "FASTFOOD";
+  // Stock, supplier, batch / expiry (and drug details) don't apply to fast food.
+  const hasStockFields = segment === "GROCERY" || segment === "PHARMACY";
+
+  // After the first submit attempt, edits are re-checked straight away.
+  const submitted = form.formState.isSubmitted;
+  const packs = (form.watch("variants") ?? []) as PackRow[];
+  const optionGroups = (form.watch("optionGroups") ?? []) as GroupRow[];
+  const packIssues = [
+    ...new Set(
+      collectIssues(form.formState.errors.variants).map(describePackIssue),
+    ),
+  ];
+  const groupIssues = [
+    ...new Set(
+      collectIssues(form.formState.errors.optionGroups).map(describeGroupIssue),
+    ),
+  ];
+
+  // The product's own price and size list are worked out from its packs (the
+  // lowest pack price, and the pack labels), so those two fields are hidden.
+  const setPacks = (rows: PackRow[]) => {
+    form.setValue("variants", rows, {
+      shouldDirty: true,
+      shouldValidate: submitted,
+    });
+    const summary = summarizePacks(rows);
+    // 1 is a placeholder while no pack has a price yet; the packs themselves
+    // are what block the submit in that case.
+    form.setValue("price", summary.price || 1, { shouldDirty: true });
+    form.setValue("sizes", summary.sizes, { shouldDirty: true });
+  };
+
+  const setOptionGroups = (next: GroupRow[]) =>
+    form.setValue("optionGroups", next, {
+      shouldDirty: true,
+      shouldValidate: submitted,
+    });
+
   const { data: categories, error: categoriesError } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
+    queryKey: ["categories", segment],
+    queryFn: () => fetchCategories(segment),
   });
 
   const [colorSearch, setColorSearch] = useState("");
@@ -72,6 +135,12 @@ const ProductForm = ({
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
 
   const anyUploading = Object.values(uploading).some(Boolean);
+
+  // Hardware photos are kept per color. Grocery / pharmacy have no colors,
+  // so they get one photo set under a single "default" key.
+  const photoKeys: string[] = isHardware
+    ? (form.watch("colors") ?? [])
+    : [DEFAULT_IMAGE_KEY];
 
   const filteredColors = useMemo(() => {
     const term = colorSearch.trim().toLowerCase();
@@ -82,23 +151,6 @@ const ProductForm = ({
   const visibleColors = colorSearch
     ? filteredColors
     : filteredColors.slice(0, 12);
-
-  const uploadToCloudinary = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "FIRST-DEPOT");
-
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-      { method: "POST", body: formData },
-    );
-    const data = await res.json();
-
-    if (!data.secure_url) {
-      throw new Error(data?.error?.message ?? "Upload failed");
-    }
-    return data.secure_url as string;
-  };
 
   // Cover photo: the one shown on the products page.
   const uploadImage = async (color: string, file: File) => {
@@ -245,24 +297,30 @@ const ProductForm = ({
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Price (UGX)</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                />
-              </FormControl>
-              <FormDescription>Enter the price of the product.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {!isGrocery && (
+          <FormField
+            control={form.control}
+            name="price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Price (UGX)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {isFastFood
+                    ? "Enter the price of the meal. Accompaniments with an extra price are added on top."
+                    : "Enter the price of the product."}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         {categoriesError && (
           <p className="text-sm text-destructive">
             Couldn&apos;t load categories. Close this panel and try again.
@@ -297,197 +355,258 @@ const ProductForm = ({
             )}
           />
         )}
-        <FormField
-          control={form.control}
-          name="sizes"
-          render={({ field }) => {
-            const currentSizes: string[] = field.value || [];
-
-            const addSize = () => {
-              const trimmed = sizeValue.trim();
-              if (!trimmed) return;
-
-              // Plain numbers get the selected unit ("20" -> "20 Liters");
-              // anything with letters is used as typed ("6 by 6").
-              const isPlainNumber = /^\d+(\.\d+)?$/.test(trimmed);
-              const newSize = isPlainNumber
-                ? `${trimmed} ${sizeUnit}`
-                : trimmed;
-
-              if (!currentSizes.includes(newSize)) {
-                field.onChange([...currentSizes, newSize]);
-              }
-              setSizeValue("");
-            };
-
-            const removeSize = (size: string) => {
-              field.onChange(currentSizes.filter((s) => s !== size));
-            };
-
-            return (
+        {isGrocery && (
+          <FormField
+            control={form.control}
+            name="variants"
+            render={() => (
               <FormItem>
-                <FormLabel>Sizes</FormLabel>
+                <FormLabel>Pack sizes &amp; prices</FormLabel>
+                <FormDescription>
+                  Sold by the kilo, or in different pack sizes? Add each pack
+                  with its own price, e.g. 500 g, 1 Kg and 25 Kg. The products
+                  page shows the lowest price.
+                </FormDescription>
                 <FormControl>
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Input
-                        placeholder="e.g. 20, 6 by 6, 1 inch nail"
-                        value={sizeValue}
-                        onChange={(e) => setSizeValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addSize();
-                          }
-                        }}
-                        className="flex-1 min-w-[160px]"
-                      />
-                      <Select value={sizeUnit} onValueChange={setSizeUnit}>
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="Unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {units.map((unit) => (
-                            <SelectItem key={unit} value={unit}>
-                              {unit}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button type="button" variant="outline" onClick={addSize}>
-                        Add
-                      </Button>
-                    </div>
-                    {currentSizes.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {currentSizes.map((size) => (
-                          <span
-                            key={size}
-                            className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs"
-                          >
-                            {size}
-                            <button
-                              type="button"
-                              onClick={() => removeSize(size)}
-                              className="ml-1 text-muted-foreground hover:text-foreground"
-                              aria-label={`Remove ${size}`}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                  <div>
+                    <VariantsEditor
+                      value={packs}
+                      onChange={setPacks}
+                      issues={packIssues}
+                    />
                   </div>
                 </FormControl>
-                <FormDescription>
-                  Type a number and pick a unit, or type a full custom size,
-                  then click Add or press Enter.
-                </FormDescription>
-                <FormMessage />
               </FormItem>
-            );
-          }}
-        />
-        <FormField
-          control={form.control}
-          name="colors"
-          render={({ field }) => {
-            const selected: string[] = field.value || [];
-
-            const toggleColor = (name: string) => {
-              if (selected.includes(name)) {
-                field.onChange(selected.filter((v) => v !== name));
-              } else {
-                field.onChange([...selected, name]);
-              }
-            };
-
-            return (
+            )}
+          />
+        )}
+        {isFastFood && (
+          <FormField
+            control={form.control}
+            name="optionGroups"
+            render={() => (
               <FormItem>
-                <FormLabel>Colors</FormLabel>
+                <FormLabel>Accompaniments &amp; add-ons</FormLabel>
+                <FormDescription>
+                  What can the customer choose with this meal? Add a side, a
+                  drink or extra sauces, and set an extra price on the items
+                  that cost more.
+                </FormDescription>
                 <FormControl>
-                  <div className="space-y-3">
-                    <Input
-                      placeholder="Search colors..."
-                      value={colorSearch}
-                      onChange={(e) => setColorSearch(e.target.value)}
+                  <div>
+                    <OptionGroupsEditor
+                      value={optionGroups}
+                      onChange={setOptionGroups}
+                      issues={groupIssues}
                     />
-                    {selected.length > 0 && (
+                  </div>
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        )}
+        {!isGrocery && !isFastFood && (
+          <FormField
+            control={form.control}
+            name="sizes"
+            render={({ field }) => {
+              const currentSizes: string[] = field.value || [];
+
+              const addSize = () => {
+                const trimmed = sizeValue.trim();
+                if (!trimmed) return;
+
+                // Plain numbers get the selected unit ("20" -> "20 Liters");
+                // anything with letters is used as typed ("6 by 6").
+                const isPlainNumber = /^\d+(\.\d+)?$/.test(trimmed);
+                const newSize = isPlainNumber
+                  ? `${trimmed} ${sizeUnit}`
+                  : trimmed;
+
+                if (!currentSizes.includes(newSize)) {
+                  field.onChange([...currentSizes, newSize]);
+                }
+                setSizeValue("");
+              };
+
+              const removeSize = (size: string) => {
+                field.onChange(currentSizes.filter((s) => s !== size));
+              };
+
+              return (
+                <FormItem>
+                  <FormLabel>Sizes</FormLabel>
+                  <FormControl>
+                    <div className="space-y-3">
                       <div className="flex flex-wrap gap-2">
-                        {selected.map((name) => {
-                          const swatch = allColors.find((c) => c.name === name);
-                          return (
+                        <Input
+                          placeholder="e.g. 20, 6 by 6, 1 inch nail"
+                          value={sizeValue}
+                          onChange={(e) => setSizeValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addSize();
+                            }
+                          }}
+                          className="flex-1 min-w-[160px]"
+                        />
+                        <Select value={sizeUnit} onValueChange={setSizeUnit}>
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {units.map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {unit}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addSize}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      {currentSizes.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {currentSizes.map((size) => (
                             <span
-                              key={name}
+                              key={size}
                               className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs"
                             >
-                              {swatch && (
-                                <span
-                                  className="h-2 w-2 rounded-full border"
-                                  style={{ backgroundColor: swatch.hex }}
-                                />
-                              )}
-                              {name}
+                              {size}
                               <button
                                 type="button"
-                                onClick={() => toggleColor(name)}
+                                onClick={() => removeSize(size)}
                                 className="ml-1 text-muted-foreground hover:text-foreground"
-                                aria-label={`Remove ${name}`}
+                                aria-label={`Remove ${size}`}
                               >
                                 ×
                               </button>
                             </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Type a number and pick a unit, or type a full custom size,
+                    then click Add or press Enter.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        )}
+        {isHardware && (
+          <FormField
+            control={form.control}
+            name="colors"
+            render={({ field }) => {
+              const selected: string[] = field.value || [];
+
+              const toggleColor = (name: string) => {
+                if (selected.includes(name)) {
+                  field.onChange(selected.filter((v) => v !== name));
+                } else {
+                  field.onChange([...selected, name]);
+                }
+              };
+
+              return (
+                <FormItem>
+                  <FormLabel>Colors</FormLabel>
+                  <FormControl>
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="Search colors..."
+                        value={colorSearch}
+                        onChange={(e) => setColorSearch(e.target.value)}
+                      />
+                      {selected.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {selected.map((name) => {
+                            const swatch = allColors.find(
+                              (c) => c.name === name,
+                            );
+                            return (
+                              <span
+                                key={name}
+                                className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs"
+                              >
+                                {swatch && (
+                                  <span
+                                    className="h-2 w-2 rounded-full border"
+                                    style={{ backgroundColor: swatch.hex }}
+                                  />
+                                )}
+                                {name}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleColor(name)}
+                                  className="ml-1 text-muted-foreground hover:text-foreground"
+                                  aria-label={`Remove ${name}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto rounded-md border p-2">
+                        {visibleColors.map((color) => {
+                          const isSelected = selected.includes(color.name);
+                          return (
+                            <button
+                              type="button"
+                              key={color.code}
+                              onClick={() => toggleColor(color.name)}
+                              className={cn(
+                                "flex items-center gap-2 rounded-md border p-2 text-left text-xs transition-colors",
+                                isSelected
+                                  ? "border-primary bg-primary/10"
+                                  : "border-input hover:bg-accent",
+                              )}
+                            >
+                              <span
+                                className="h-4 w-4 shrink-0 rounded-full border"
+                                style={{ backgroundColor: color.hex }}
+                              />
+                              <span className="truncate">{color.name}</span>
+                            </button>
                           );
                         })}
                       </div>
-                    )}
-                    <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto rounded-md border p-2">
-                      {visibleColors.map((color) => {
-                        const isSelected = selected.includes(color.name);
-                        return (
-                          <button
-                            type="button"
-                            key={color.code}
-                            onClick={() => toggleColor(color.name)}
-                            className={cn(
-                              "flex items-center gap-2 rounded-md border p-2 text-left text-xs transition-colors",
-                              isSelected
-                                ? "border-primary bg-primary/10"
-                                : "border-input hover:bg-accent",
-                            )}
-                          >
-                            <span
-                              className="h-4 w-4 shrink-0 rounded-full border"
-                              style={{ backgroundColor: color.hex }}
-                            />
-                            <span className="truncate">{color.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {!colorSearch &&
-                      filteredColors.length > visibleColors.length && (
+                      {!colorSearch &&
+                        filteredColors.length > visibleColors.length && (
+                          <p className="text-xs text-muted-foreground">
+                            Showing {visibleColors.length} of{" "}
+                            {filteredColors.length} colors — search to find
+                            more.
+                          </p>
+                        )}
+                      {colorSearch && filteredColors.length === 0 && (
                         <p className="text-xs text-muted-foreground">
-                          Showing {visibleColors.length} of{" "}
-                          {filteredColors.length} colors — search to find more.
+                          No colors match &quot;{colorSearch}&quot;.
                         </p>
                       )}
-                    {colorSearch && filteredColors.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        No colors match &quot;{colorSearch}&quot;.
-                      </p>
-                    )}
-                  </div>
-                </FormControl>
-                <FormDescription>
-                  Search and select the available colors for the product.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
-        />
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Search and select the available colors for the product.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        )}
         <FormField
           control={form.control}
           name="images"
@@ -495,13 +614,13 @@ const ProductForm = ({
             <FormItem>
               <FormLabel>Images</FormLabel>
               <FormDescription>
-                For each color, add one cover photo (shown on the products page)
-                and up to {MAX_GALLERY_IMAGES} extra photos (shown on the
-                product&apos;s own page).
+                {isHardware ? "For each color, add" : "Add"} one cover photo
+                (shown on the products page) and up to {MAX_GALLERY_IMAGES}{" "}
+                extra photos (shown on the product&apos;s own page).
               </FormDescription>
               <FormControl>
                 <div className="space-y-4">
-                  {form.watch("colors")?.map((color) => {
+                  {photoKeys.map((color) => {
                     const swatch = allColors.find((c) => c.name === color);
                     const url = field.value?.[color];
                     const extras = form.watch("gallery")?.[color] ?? [];
@@ -512,13 +631,23 @@ const ProductForm = ({
                         key={color}
                       >
                         <div className="flex items-center gap-2">
-                          <div
-                            className="h-4 w-4 rounded-full border"
-                            style={{
-                              backgroundColor: swatch?.hex ?? "#cccccc",
-                            }}
-                          />
-                          <span className="text-sm font-medium">{color}</span>
+                          {color === DEFAULT_IMAGE_KEY ? (
+                            <span className="text-sm font-medium">
+                              Product photos
+                            </span>
+                          ) : (
+                            <>
+                              <div
+                                className="h-4 w-4 rounded-full border"
+                                style={{
+                                  backgroundColor: swatch?.hex ?? "#cccccc",
+                                }}
+                              />
+                              <span className="text-sm font-medium">
+                                {color}
+                              </span>
+                            </>
+                          )}
                         </div>
 
                         <div className="space-y-1">
@@ -632,6 +761,8 @@ const ProductForm = ({
             </FormItem>
           )}
         />
+        {/* Stock, supplier, batch / expiry and (pharmacy) drug details. */}
+        {hasStockFields && <SegmentFields form={form} segment={segment} />}
         <Button
           type="submit"
           disabled={isPending || anyUploading}

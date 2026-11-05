@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { ProductFormSchema } from "@repo/types";
+import { DEFAULT_IMAGE_KEY } from "@repo/types";
+import type { BulkProductItem, ProductFormSchema } from "@repo/types";
 
 // Values the product form edits and the product service stores.
 export type ProductFormValues = z.infer<typeof ProductFormSchema>;
@@ -40,6 +41,9 @@ const failure = async (res: Response, fallback: string): Promise<ApiError> => {
         "This product no longer exists. Refresh the page.",
         404,
       );
+    case 409:
+      // e.g. a barcode that another product already uses.
+      return new ApiError(serverMessage ?? fallback, 409);
     default:
       return new ApiError(fallback, res.status);
   }
@@ -81,22 +85,38 @@ const send = async (
   if (!res.ok) throw await failure(res, fallback);
 };
 
-// Keeps only the photos for colors that are still selected, so removing a
-// color also removes its cover and extra photos. Run before create/update.
+// Keeps only the photos that are still in use, so removing a color also
+// removes its cover and extra photos. Hardware photos are keyed by color;
+// grocery / pharmacy have no colors and keep a single "default" photo set.
+// Blank optional fields are dropped (an empty barcode must not be saved).
+// Run before create/update.
 export const cleanProductValues = (
   values: ProductFormValues,
 ): ProductFormValues => {
+  const isHardware = values.segment === "HARDWARE";
+  const keys = isHardware ? values.colors : [DEFAULT_IMAGE_KEY];
+
   const images = Object.fromEntries(
-    values.colors
-      .filter((color) => values.images[color])
-      .map((color) => [color, values.images[color] as string]),
+    keys
+      .filter((key) => values.images[key])
+      .map((key) => [key, values.images[key] as string]),
   );
   const gallery = Object.fromEntries(
-    values.colors
-      .filter((color) => (values.gallery?.[color]?.length ?? 0) > 0)
-      .map((color) => [color, values.gallery?.[color] as string[]]),
+    keys
+      .filter((key) => (values.gallery?.[key]?.length ?? 0) > 0)
+      .map((key) => [key, values.gallery?.[key] as string[]]),
   );
-  return { ...values, images, gallery };
+
+  const withoutBlanks = Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== ""),
+  ) as ProductFormValues;
+
+  return {
+    ...withoutBlanks,
+    colors: isHardware ? values.colors : [],
+    images,
+    gallery,
+  };
 };
 
 export const createProduct = (values: ProductFormValues, token: string | null) =>
@@ -105,6 +125,26 @@ export const createProduct = (values: ProductFormValues, token: string | null) =
     { method: "POST", body: JSON.stringify(values) },
     token,
     "Something went wrong while creating the product. Please try again.",
+  );
+
+export type BulkProductsPayload = {
+  segment: "GROCERY" | "PHARMACY";
+  supplier: string;
+  items: BulkProductItem[];
+};
+
+// One supplier delivery: many grocery / pharmacy products at once. The
+// service writes all of them or none, and its 400 message names the rows
+// that need fixing ("Row 3: Batch number is required ...").
+export const createProductsBulk = (
+  payload: BulkProductsPayload,
+  token: string | null,
+) =>
+  send(
+    "/products/bulk",
+    { method: "POST", body: JSON.stringify(payload) },
+    token,
+    "Something went wrong while adding the products. Nothing was added. Please try again.",
   );
 
 export const updateProduct = (

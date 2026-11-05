@@ -9,6 +9,7 @@ import {
 } from "@repo/quote-db";
 import { sendMail } from "../lib/mailer";
 import { PRICE_DIVISOR } from "./_config";
+import { QUOTE_PRODUCT_FILTER } from "./_catalog";
 import { lineTotal } from "./format";
 import { customerEmail, staffEmail } from "./quoteEmail";
 import {
@@ -72,7 +73,10 @@ export const submitQuoteAction = async (raw: unknown): Promise<SubmitResult> => 
     };
   }
 
-  // Never trust a catalogue price from the browser: look it up again.
+  // Never trust a catalogue price from the browser: look it up again. Only
+  // hardware products are looked up. A product id from another section
+  // (grocery, pharmacy) finds nothing here, so that line is kept as the
+  // customer typed it, unpriced, exactly like a deleted product.
   const ids = [
     ...new Set(
       input.items.flatMap((i) => (i.productId != null ? [i.productId] : [])),
@@ -83,7 +87,7 @@ export const submitQuoteAction = async (raw: unknown): Promise<SubmitResult> => 
     try {
       const rows = await withTimeout(
         prisma.product.findMany({
-          where: { id: { in: ids } },
+          where: { id: { in: ids }, ...QUOTE_PRODUCT_FILTER },
           select: { id: true, name: true, price: true },
         }),
         8_000,

@@ -11,5 +11,23 @@ export {
 } from "./quote-model";
 
 export { connectQuoteDB } from "./connection";
-export { createQuote, markQuoteEmail, getQuotes, type NewQuote } from "./queries";
+export {
+  createQuote,
+  markQuoteEmail,
+  getQuotes,
+  getQuoteByReference,
+  countNewQuotes,
+  setQuoteStatus,
+  type NewQuote,
+} from "./queries";
 export { srvToStandardUri } from "./srv";
+
+// Admin dashboard todo list (shares this package's MongoDB connection).
+export { Todo, type TodoPlain } from "./todo-model";
+export {
+  listTodos,
+  createTodo,
+  setTodoDone,
+  deleteTodo,
+  type TodoView,
+} from "./todo-queries";

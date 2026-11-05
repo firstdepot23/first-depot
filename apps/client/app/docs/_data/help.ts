@@ -47,7 +47,7 @@ export const help: DocPage = {
       title: "Payments",
       blocks: [
         h3("Which payment methods do you accept?"),
-        p(`Mobile money, bank cards and bank transfer. Trade accounts can also arrange invoice terms.`),
+        p(`Mobile money, bank cards and bank transfer, processed securely through ${c.paymentProvider}. Trade accounts can also arrange invoice terms.`),
         h3("My payment failed. Was I charged?"),
         p(
           `If an order shows as *failed*, no money has been taken. If you were charged and the order still shows as failed, contact us with your payment reference and we will sort it out.`,

@@ -4,6 +4,16 @@
 //   **bold**   *italic*   `code`   [link text](/docs/privacy-policy)
 //   External links (https://, mailto:, tel:) work too.
 
+export type ProductItem = {
+  name: string;
+  /** Display price, e.g. "UGX 185,000". */
+  price?: string;
+  /** Absolute image URL (or a path under /public). */
+  image: string;
+  /** One short line under the name. */
+  blurb?: string;
+};
+
 export type Block =
   | { type: "p"; text: string }
   | { type: "h3"; text: string }
@@ -11,7 +21,8 @@ export type Block =
   | { type: "ol"; items: string[] }
   | { type: "code"; code: string }
   | { type: "table"; head: string[]; rows: string[][] }
-  | { type: "note"; text: string };
+  | { type: "note"; text: string }
+  | { type: "products"; items: ProductItem[] };
 
 export type DocSection = {
   /** Used for the #anchor and the Contents highlight. Keep it unique per page. */
@@ -20,7 +31,18 @@ export type DocSection = {
   blocks: Block[];
 };
 
-export type DocGroup = "Policies" | "Company" | "Help and safety" | "Build and shop";
+// "Our Businesses" covers the group structure (First Depot Inc and its
+// subsidiaries/product lines). "GLS" is its own group, separate from
+// "Policies", because GLS has its own Terms of Service and Privacy Policy -
+// different documents for a different kind of customer (a business running
+// GLS) than the hardware store's (a shopper buying from us).
+export type DocGroup =
+  | "Policies"
+  | "Company"
+  | "Our Businesses"
+  | "Help and safety"
+  | "Build and shop"
+  | "GLS";
 
 export type DocPage = {
   slug: string;
@@ -48,4 +70,8 @@ export const table = (head: string[], ...rows: string[][]): Block => ({
   type: "table",
   head,
   rows,
+});
+export const productGrid = (...items: ProductItem[]): Block => ({
+  type: "products",
+  items,
 });

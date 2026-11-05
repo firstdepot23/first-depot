@@ -1,5 +1,12 @@
 import Link from "next/link";
 
+// The tagline: each department links to its own section.
+const departments = [
+  { label: "HOME IMPROVEMENT", href: "/products?segment=hardware" },
+  { label: "GROCERIES", href: "/products?segment=grocery" },
+  { label: "PHARMACY", href: "/pharmacy" },
+];
+
 const documentLinks = [
   { label: "Terms of Service", href: "/docs/terms-of-service" },
   { label: "Privacy Policy", href: "/docs/privacy-policy" },
@@ -14,10 +21,24 @@ const Footer = () => {
   return (
     <footer className="relative z-10 mt-16 rounded-2xl bg-[#c3e1d6] py-8 text-[#1e4a3c]">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
-        {/* LINE 1: TAGLINE */}
-        <p className="text-center font-serif text-sm tracking-[0.12em] sm:text-base">
-          HOME IMPROVEMENT COMPANY.&nbsp;BUILDING COMFORT FOR YOUR HOME.
-        </p>
+        {/* LINE 1: TAGLINE (each department is a link) */}
+        <nav
+          aria-label="Shop by department"
+          className="text-center font-serif text-sm tracking-[0.12em] sm:text-base"
+        >
+          {departments.map((department, i) => (
+            <span key={department.label}>
+              <Link
+                href={department.href}
+                className="underline decoration-[#0b2e23] decoration-1 underline-offset-4 transition-colors hover:text-[#0b2e23] hover:decoration-[#0b2e23] focus-visible:text-[#0b2e23] focus-visible:decoration-[#0b2e23] md:decoration-transparent"
+              >
+                {department.label}
+              </Link>
+              <span aria-hidden="true">.</span>
+              {i < departments.length - 1 && " "}
+            </span>
+          ))}
+        </nav>
 
         <div className="h-px w-full bg-[#1e4a3c]/20" />
 

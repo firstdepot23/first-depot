@@ -4,7 +4,7 @@ import { Suspense } from "react";
 // Adjust this path if NavigationProgress lives somewhere else in your app.
 import NavProgress from "./_components/NavProgress";
 import { DocsShell } from "./_components/DocsShell";
-import { company } from "./_data/company";
+import { inc } from "./_data/company";
 import "./docs.css";
 
 const serif = Source_Serif_4({
@@ -16,10 +16,10 @@ const serif = Source_Serif_4({
 
 export const metadata: Metadata = {
   title: {
-    default: `Documents | ${company.name}`,
-    template: `%s | ${company.name}`,
+    default: `Documents | ${inc.name}`,
+    template: `%s | ${inc.name}`,
   },
-  description: `Policies, help and product information from ${company.legalName}.`,
+  description: `Policies, help and product information from ${inc.legalName} and the businesses it runs.`,
 };
 
 export default function DocsLayout({
@@ -29,7 +29,7 @@ export default function DocsLayout({
 }) {
   return (
     <DocsShell
-      brand={company.name}
+      brand={inc.name}
       fontClassName={serif.variable}
       // The reader covers the whole screen, so it needs its own loading
       // feedback: the storefront's copy would be hidden behind it. This one

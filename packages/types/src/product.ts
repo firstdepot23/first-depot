@@ -1,9 +1,55 @@
-import type { Product, Category } from "@repo/product-db";
+import type {
+  Product,
+  Category,
+  Segment,
+  ProductVariant,
+  ProductOptionGroup,
+  ProductOption,
+} from "@repo/product-db";
 import z from "zod";
 
-export type ProductType = Product;
+export type ProductVariantType = ProductVariant;
+
+export type ProductOptionGroupType = ProductOptionGroup & {
+  options: ProductOption[];
+};
+
+// `variants` (grocery pack sizes) and `optionGroups` (fast-food accompaniments)
+// come with every product from the product service. They are optional so a
+// product loaded from somewhere that doesn't include them still type-checks.
+export type ProductType = Product & {
+  variants?: ProductVariantType[];
+  optionGroups?: ProductOptionGroupType[];
+};
 
 export type ProductsType = ProductType[];
+
+export type { Segment };
+
+// Display order for anything that lists segments (admin sidebar, lists).
+export const SEGMENT_ORDER = [
+  "GROCERY",
+  "FASTFOOD",
+  "PHARMACY",
+  "HARDWARE",
+] as const;
+
+export const SEGMENT_LABELS: Record<Segment, string> = {
+  GROCERY: "Grocery",
+  FASTFOOD: "Fast Food",
+  PHARMACY: "Pharmacy",
+  HARDWARE: "Hardware",
+};
+
+// Grocery is sold in packs (500 g, 1 Kg, 25 Kg ...), each with its own price.
+export const usesPackSizes = (segment: Segment) => segment === "GROCERY";
+
+// Fast food has accompaniments / substitutes / add-ons chosen by the customer.
+export const usesOptionGroups = (segment: Segment) => segment === "FASTFOOD";
+
+// "1 Kg", "1  kg" and "1 KG" are the same pack.
+export const normalizePackLabel = (label: string) =>
+  label.trim().toLowerCase().replace(/\s+/g, " ");
 
 export type StripeProductType = {
   id: string;
@@ -240,6 +286,17 @@ export const units = [
   "Tons",
   "Each",
   "Single Unit",
+  // Grocery / pharmacy pack units.
+  "Packs",
+  "Packets",
+  "Bottles",
+  "Cans",
+  "Sachets",
+  "Tablets",
+  "Capsules",
+  "Strips",
+  "Tubes",
+  "Vials",
 ] as const;
 
 export type UnitType = (typeof units)[number];
@@ -249,8 +306,94 @@ export type UnitType = (typeof units)[number];
 export const MAX_GALLERY_IMAGES = 8;
 export const MAX_PHOTOS_PER_COLOR = 1 + MAX_GALLERY_IMAGES;
 
+// Grocery / pharmacy products aren't sold by color, so their photos live
+// under this single key in `images` / `gallery` (hardware uses the color
+// name as the key). Keep in sync with DEFAULT_IMAGE_KEY in the product
+// service's product.controller.ts.
+export const DEFAULT_IMAGE_KEY = "default";
+
+// Most lines one supplier delivery can have in a single bulk entry. Keep in
+// sync with MAX_BULK_ITEMS in the product service's product.controller.ts.
+export const MAX_BULK_ITEMS = 200;
+
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .optional();
+
+// Keep in sync with MAX_VARIANTS / MAX_OPTION_GROUPS / MAX_OPTIONS_PER_GROUP
+// in the product service's lib/productExtras.ts.
+export const MAX_VARIANTS = 30;
+export const MAX_OPTION_GROUPS = 10;
+export const MAX_OPTIONS_PER_GROUP = 60;
+
+const segmentEnum = z.enum(["HARDWARE", "GROCERY", "PHARMACY", "FASTFOOD"], {
+  message: "Segment is required!",
+});
+
+// One pack of a grocery product: its own size label, price and stock.
+export const ProductVariantSchema = z.object({
+  // Present when editing a pack that is already saved.
+  id: z.number().int().optional(),
+  label: z
+    .string({ message: "Pack size is required" })
+    .trim()
+    .min(1, { message: "Pack size is required" }),
+  price: z
+    .number({ message: "Price is required" })
+    .int({ message: "Price must be a whole number" })
+    .min(1, { message: "Price must be at least 1" }),
+  costPrice: z
+    .number()
+    .int({ message: "Cost price must be a whole number" })
+    .min(0, { message: "Cost price must be 0 or more" })
+    .optional(),
+  stock: z
+    .number()
+    .int({ message: "Stock must be a whole number" })
+    .min(0, { message: "Stock must be 0 or more" })
+    .optional(),
+  barcode: z.string().optional(),
+});
+
+export type ProductVariantInput = z.infer<typeof ProductVariantSchema>;
+
+// One choice inside an option group ("Chips", "Masala chips +6,500").
+export const ProductOptionSchema = z.object({
+  id: z.number().int().optional(),
+  name: z
+    .string({ message: "Item name is required" })
+    .trim()
+    .min(1, { message: "Item name is required" }),
+  extraPrice: z
+    .number({ message: "Extra price must be a number" })
+    .int({ message: "Extra price must be a whole number" })
+    .min(0, { message: "Extra price must be 0 or more" }),
+  available: z.boolean(),
+});
+
+// A question on a fast-food product: "Choose an accompaniment", "Add a sauce".
+export const ProductOptionGroupSchema = z.object({
+  id: z.number().int().optional(),
+  name: z
+    .string({ message: "Group name is required" })
+    .trim()
+    .min(1, { message: "Group name is required" }),
+  selection: z.enum(["SINGLE", "MULTIPLE"]),
+  required: z.boolean(),
+  options: z
+    .array(ProductOptionSchema)
+    .min(1, { message: "Add at least one item to this group" })
+    .max(MAX_OPTIONS_PER_GROUP, {
+      message: `A group can have up to ${MAX_OPTIONS_PER_GROUP} items`,
+    }),
+});
+
+export type ProductOptionGroupInput = z.infer<typeof ProductOptionGroupSchema>;
+
 export const ProductFormSchema = z
   .object({
+    segment: segmentEnum,
     name: z
       .string({ message: "Product name is required!" })
       .min(1, { message: "Product name is required!" }),
@@ -267,40 +410,197 @@ export const ProductFormSchema = z
     categorySlug: z
       .string({ message: "Category is required!" })
       .min(1, { message: "Category is required!" }),
-    sizes: z
-      .array(z.string().min(1))
-      .min(1, { message: "At least one size is required!" }),
-    colors: z
-      .array(z.string().min(1))
-      .min(1, { message: "At least one color is required!" }),
-    images: z.record(z.string(), z.string(), {
-      message: "Image for each color is required!",
-    }),
+    // Pack size / unit - universal across segments (e.g. "4 Liters" for
+    // hardware, "1 Kg" for grocery, "30 Tablets" for pharmacy).
+    // Required for hardware / pharmacy (checked below). Grocery derives it
+    // from `variants`; fast food doesn't use it.
+    sizes: z.array(z.string().min(1)),
+    // Color variants only really apply to hardware (paint, etc). Left
+    // empty by default for grocery/pharmacy - see the segment check below.
+    colors: z.array(z.string().min(1)).default([]),
+    images: z.record(z.string(), z.string()).default({}),
     // Extra photos per color. Optional, so older products and callers that
     // only know about `images` keep working.
     gallery: z
-      .record(
-        z.string(),
-        z.array(z.string().min(1)).max(MAX_GALLERY_IMAGES),
-      )
+      .record(z.string(), z.array(z.string().min(1)).max(MAX_GALLERY_IMAGES))
+      .optional(),
+
+    // ---- Shared commerce / inventory (any segment) ----
+    costPrice: z.number().min(0, { message: "Must be 0 or more" }).optional(),
+    wholesalePrice: z
+      .number()
+      .min(0, { message: "Must be 0 or more" })
+      .optional(),
+    supplier: z.string().optional(),
+    barcode: z.string().optional(),
+    // Units on hand. Set by bulk supplier entry; editable afterwards.
+    stock: z
+      .number()
+      .int({ message: "Stock must be a whole number" })
+      .min(0, { message: "Must be 0 or more" })
+      .optional(),
+
+    // ---- Perishable tracking (grocery + pharmacy) ----
+    batchNumber: z.string().optional(),
+    manufacturingDate: isoDate,
+    expiryDate: isoDate,
+
+    // ---- Pharmacy-only ----
+    formulation: z.string().optional(),
+    dosageStrength: z.string().optional(),
+    activeIngredient: z.string().optional(),
+    manufacturer: z.string().optional(),
+    prescriptionRequired: z.boolean().optional(),
+    storageConditions: z.string().optional(),
+    registrationNumber: z.string().optional(),
+
+    // ---- Grocery: one entry per pack size, each with its own price ----
+    variants: z
+      .array(ProductVariantSchema)
+      .max(MAX_VARIANTS, {
+        message: `A product can have up to ${MAX_VARIANTS} pack sizes`,
+      })
+      .optional(),
+
+    // ---- Fast food: accompaniments, substitutes and add-ons ----
+    optionGroups: z
+      .array(ProductOptionGroupSchema)
+      .max(MAX_OPTION_GROUPS, {
+        message: `A product can have up to ${MAX_OPTION_GROUPS} option groups`,
+      })
       .optional(),
   })
-  .refine(
-    (data) => {
-      const missingImages = data.colors.filter(
-        (color: string) => !data.images?.[color]
-      );
-      return missingImages.length === 0;
-    },
-    {
-      message: "Image is required for each selected color!",
-      path: ["images"],
+  .superRefine((data, ctx) => {
+    if (data.segment === "GROCERY") {
+      const packs = data.variants ?? [];
+      if (packs.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Add at least one pack size with its price!",
+          path: ["variants"],
+        });
+      }
+      const seen = new Set<string>();
+      packs.forEach((pack, index) => {
+        const key = normalizePackLabel(pack.label);
+        if (!key) return;
+        if (seen.has(key)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `"${pack.label.trim()}" is listed twice`,
+            path: ["variants", index, "label"],
+          });
+        }
+        seen.add(key);
+      });
+    } else if (data.segment !== "FASTFOOD" && data.sizes.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "At least one size is required!",
+        path: ["sizes"],
+      });
     }
-  );
+
+    if (data.segment === "HARDWARE") {
+      if (data.colors.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "At least one color is required for hardware products!",
+          path: ["colors"],
+        });
+      }
+      const missingColors = data.colors.filter(
+        (color) => !data.images?.[color],
+      );
+      if (missingColors.length > 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Image is required for each selected color!",
+          path: ["images"],
+        });
+      }
+    } else if (Object.keys(data.images ?? {}).length === 0) {
+      // Grocery/pharmacy aren't sold by color - just need one photo.
+      ctx.addIssue({
+        code: "custom",
+        message: "At least one product photo is required!",
+        path: ["images"],
+      });
+    }
+
+    if (data.segment === "PHARMACY") {
+      if (!data.batchNumber) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Batch number is required for pharmacy products!",
+          path: ["batchNumber"],
+        });
+      }
+      if (!data.expiryDate) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Expiry date is required for pharmacy products!",
+          path: ["expiryDate"],
+        });
+      }
+    }
+  });
+
+// One line of a supplier delivery (grocery / pharmacy bulk entry). Each line
+// becomes one product, with `quantity` as its opening stock. Pharmacy's extra
+// "batch number + expiry date required" rule depends on the segment, so the
+// bulk form and the service check it separately.
+const optionalText = z.string().trim().optional();
+
+export const BulkProductItemSchema = z.object({
+  name: z
+    .string({ message: "Product name is required" })
+    .trim()
+    .min(1, { message: "Product name is required" }),
+  categorySlug: z
+    .string({ message: "Category is required" })
+    .min(1, { message: "Category is required" }),
+  size: z
+    .string({ message: "Size / unit is required" })
+    .trim()
+    .min(1, { message: "Size / unit is required" }),
+  quantity: z
+    .number({ message: "Quantity is required" })
+    .int({ message: "Quantity must be a whole number" })
+    .min(1, { message: "Quantity must be at least 1" }),
+  price: z
+    .number({ message: "Selling price is required" })
+    .int({ message: "Selling price must be a whole number" })
+    .min(1, { message: "Selling price must be at least 1" }),
+  costPrice: z
+    .number({ message: "Cost price must be a number" })
+    .int({ message: "Cost price must be a whole number" })
+    .min(0, { message: "Cost price must be 0 or more" })
+    .optional(),
+  description: optionalText,
+  barcode: optionalText,
+  batchNumber: optionalText,
+  manufacturingDate: isoDate,
+  expiryDate: isoDate,
+  // Cloudinary URL. Optional: a photo can be added later by editing the product.
+  image: z.string().optional(),
+
+  // ---- Pharmacy-only ----
+  formulation: optionalText,
+  dosageStrength: optionalText,
+  activeIngredient: optionalText,
+  manufacturer: optionalText,
+  registrationNumber: optionalText,
+  storageConditions: optionalText,
+  prescriptionRequired: z.boolean().optional(),
+});
+
+export type BulkProductItem = z.infer<typeof BulkProductItemSchema>;
 
 export type CategoryType = Category;
 
 export const CategoryFormSchema = z.object({
+  segment: segmentEnum,
   name: z
     .string({ message: "Name is Required!" })
     .min(1, { message: "Name is Required!" }),
@@ -318,8 +618,11 @@ export const photosForColor = (
   const images = product.images as Record<string, unknown> | null | undefined;
   const gallery = product.gallery as Record<string, unknown> | null | undefined;
 
-  const cover = images?.[color];
-  const extras = gallery?.[color];
+  // Grocery / pharmacy products have no colors: their photos live under
+  // DEFAULT_IMAGE_KEY, so an empty color means "the default photos".
+  const key = color || DEFAULT_IMAGE_KEY;
+  const cover = images?.[key];
+  const extras = gallery?.[key];
 
   return [
     ...(typeof cover === "string" && cover ? [cover] : []),

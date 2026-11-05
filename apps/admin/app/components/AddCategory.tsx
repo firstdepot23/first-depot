@@ -20,8 +20,20 @@ import {
 } from "./ui/form";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import { CategoryFormSchema } from "@repo/types";
-import { useMutation } from "@tanstack/react-query";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  CategoryFormSchema,
+  SEGMENT_LABELS,
+  SEGMENT_ORDER,
+  type Segment,
+} from "@repo/types";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "react-toastify";
 
@@ -40,16 +52,24 @@ class ApiError extends Error {
   }
 }
 
-const AddCategory = () => {
+// `defaultSegment` pre-selects the segment, e.g. the sidebar's Grocery
+// section opens this with GROCERY already chosen.
+const AddCategory = ({
+  defaultSegment = "HARDWARE",
+}: {
+  defaultSegment?: Segment;
+}) => {
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(CategoryFormSchema),
     defaultValues: {
+      segment: defaultSegment,
       name: "",
       slug: "",
     },
   });
 
   const { getToken } = useAuth();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (data: CategoryFormValues) => {
@@ -113,7 +133,10 @@ const AddCategory = () => {
     },
     onSuccess: () => {
       toast.success("Category created successfully");
-      form.reset();
+      // Keep the segment so several categories can be added in a row.
+      form.reset({ segment: form.getValues("segment"), name: "", slug: "" });
+      // Any open product form should see the new category.
+      void queryClient.invalidateQueries({ queryKey: ["categories"] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -142,6 +165,36 @@ const AddCategory = () => {
               className="space-y-8"
               onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
             >
+              <FormField
+                control={form.control}
+                name="segment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Segment</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a segment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SEGMENT_ORDER.map((segment) => (
+                            <SelectItem key={segment} value={segment}>
+                              {SEGMENT_LABELS[segment]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      Which section this category belongs to.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="name"

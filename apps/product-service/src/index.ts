@@ -60,14 +60,31 @@ process.on("uncaughtException", (error) => {
   console.error("Uncaught exception:", error);
 });
 
-// Render injects PORT. Locally, set PORT=10000 in .env (or rely on the fallback).
-const port = Number(process.env.PORT) || 10000;
+// Render injects PORT (10000 there). Locally this defaults to 8000, so it can't
+// clash with another local service that is already sitting on 10000.
+const port = Number(process.env.PORT) || 8000;
 
 // Listen immediately. This service used to connect to Kafka BEFORE opening
 // its port, so while Kafka was slow (or failing) Render saw no open port and
 // the website got 502. The product service does not need Kafka any more:
 // the only consumer of product.created / product.deleted was the payment
 // service's Stripe sync, which no longer exists.
-app.listen(port, "0.0.0.0", () => {
+const server = app.listen(port, "0.0.0.0", () => {
   console.log(`Product service is running on ${port}`);
+});
+
+// If the port is already taken, say so and stop. Without this, the
+// uncaughtException handler above swallowed the error: the service never
+// started listening, while ANOTHER program kept answering on the same port
+// and the admin app received that program's replies instead of products.
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(
+      `Product service could NOT start: port ${port} is already in use by another program. ` +
+        `Stop that program, or give this service a different PORT.`,
+    );
+  } else {
+    console.error("Product service could not start listening:", error);
+  }
+  process.exit(1);
 });

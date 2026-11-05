@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useState } from "react";
-import useCartStore from "../stores/storeCart";
+import { useCheckoutCart } from "../lib/segmentCart";
 
 type Status = "idle" | "submitting" | "failed";
 
@@ -12,7 +12,9 @@ type Status = "idle" | "submitting" | "failed";
 const PAYMENT_API = "/api/svc/payment";
 
 const MobileMoneyForm = () => {
-  const { cart } = useCartStore();
+  // Only the cart being paid for (hardware, grocery OR pharmacy), never all
+  // three: paying one cart must not charge the others.
+  const { items } = useCheckoutCart();
   const { getToken } = useAuth();
 
   const [phone, setPhone] = useState("");
@@ -32,7 +34,7 @@ const MobileMoneyForm = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          cart,
+          cart: items,
 
           phone: phone.trim()
             ? `+256${phone.trim().replace(/^0+/, "")}`

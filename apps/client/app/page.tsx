@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const Homepage = async ({
   searchParams,
 }: {
-  searchParams: Promise<{ category: string }>;
+  searchParams: Promise<{ category?: string }>;
 }) => {
   const category = (await searchParams).category;
   return (
@@ -20,7 +20,9 @@ const Homepage = async ({
       <h1 className="sr-only">
         First Depot: Hardware &amp; Home Improvement Company in Lira, Uganda
       </h1>
-      <ProductList category={category} params="homepage" />
+      {/* The homepage is hardware only. Grocery and pharmacy are reached from
+          the Shop menu. (ProductList also enforces this for "homepage".) */}
+      <ProductList segment="hardware" category={category} params="homepage" />
     </div>
   );
 };

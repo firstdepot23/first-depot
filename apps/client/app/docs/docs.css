@@ -25,8 +25,8 @@
   overscroll-behavior: contain; /* never scroll the storefront underneath */
   background: var(--fd-bg);
   color: var(--fd-fg);
-  font-family: var(--fd-docs-font), "Iowan Old Style", "Palatino Linotype",
-    Georgia, serif;
+  font-family:
+    var(--fd-docs-font), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   font-size: 18px;
   line-height: 32px;
   font-weight: 400;
@@ -149,7 +149,9 @@
   height: 36px;
   border-radius: 50%;
   color: var(--fd-fg);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .fd-docs-dock a:hover {
@@ -568,4 +570,57 @@
     width: 34px;
     height: 34px;
   }
+}
+
+/* ---------- product cards ---------- */
+
+.fd-docs-article .fd-docs-products {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.fd-docs-product {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--fd-rule);
+  border-radius: 8px;
+  background: var(--fd-chip);
+}
+
+.fd-docs-product img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  background: var(--fd-chip);
+}
+
+.fd-docs-product figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.fd-docs-product figcaption strong {
+  color: var(--fd-strong);
+}
+
+.fd-docs-product figcaption span {
+  color: var(--fd-soft);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fd-docs-product figcaption b {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--fd-fg);
 }

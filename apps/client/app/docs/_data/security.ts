@@ -40,7 +40,7 @@ export const security: DocPage = {
       title: "Payment security",
       blocks: [
         p(
-          `Payments are processed by a licensed payment provider on its own secure pages. Your card number and mobile money PIN go straight to them and never pass through, or sit on, our servers. We only receive a payment status and a reference so we can match it to your order.`,
+          `Payments are processed by ${c.paymentProvider}, our licensed payment provider, on its own secure pages. Your card number and mobile money PIN go straight to them and never pass through, or sit on, our servers. We only receive a payment status and a reference so we can match it to your order.`,
         ),
       ],
     },
